@@ -22,7 +22,7 @@
     } from "../services/api";
     import type { NFeIdentification } from "../types/nfeTypes";
 
-    export let navigateTo: (path: string) => void;
+    export const navigateTo: (path: string) => void = () => {};
 
     interface FormData {
         natOp: string;
@@ -55,7 +55,7 @@
     let isFormModalOpen = false;
     let isDeleteModalOpen = false;
     let itemToDelete: string | null = null;
-    let error: string | null = null;
+    let errorMessage: string | null = null;
     let loading = false;
     let items: NFeIdentification[] = [];
 
@@ -154,9 +154,9 @@
         try {
             loading = true;
             items = await fetchIdentifications();
-        } catch (error: unknown) {
-            const err = error as Error;
-            error = err.message || "Failed to load items";
+        } catch (e: unknown) {
+            errorMessage =
+                e instanceof Error ? e.message : "Failed to load items";
         } finally {
             loading = false;
         }
@@ -178,9 +178,9 @@
             });
             items = [...items, newItem];
             isFormModalOpen = false;
-        } catch (error: unknown) {
-            const err = error as Error;
-            error = err.message || "Failed to create item";
+        } catch (e: unknown) {
+            errorMessage =
+                e instanceof Error ? e.message : "Failed to create item";
         }
     }
 
@@ -209,9 +209,9 @@
             );
             isFormModalOpen = false;
             editingItem = null;
-        } catch (error: unknown) {
-            const err = error as Error;
-            error = err.message || "Failed to update item";
+        } catch (e: unknown) {
+            errorMessage =
+                e instanceof Error ? e.message : "Failed to update item";
         }
     }
 
@@ -222,9 +222,9 @@
             items = items.filter((item) => item.internal_key !== itemToDelete);
             isDeleteModalOpen = false;
             itemToDelete = null;
-        } catch (error: unknown) {
-            const err = error as Error;
-            error = err.message || "Failed to delete item";
+        } catch (e: unknown) {
+            errorMessage =
+                e instanceof Error ? e.message : "Failed to delete item";
         }
     }
 
@@ -324,12 +324,12 @@
         </div>
     {/if}
 
-    {#if error}
+    {#if errorMessage}
         <InlineNotification
             kind="error"
             title="Error"
-            subtitle={error}
-            on:close={() => (error = null)}
+            subtitle={errorMessage}
+            on:close={() => (errorMessage = null)}
         />
     {/if}
 
