@@ -22,6 +22,8 @@
     } from "../services/api";
     import type { NFeIdentification } from "../types/nfeTypes";
 
+    export let navigateTo: (path: string) => void;
+
     let searchQuery = "";
     let isFilterPanelOpen = false;
     let editingItem: NFeIdentification | null = null;
