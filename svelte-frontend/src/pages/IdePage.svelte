@@ -477,7 +477,11 @@
                             on:click={() => handleRowClick(row)}
                         >
                             {#each headers as { key }}
-                                <td>
+                                <td
+                                    class="cell-{key}"
+                                    data-column={key}
+                                    aria-label={key}
+                                >
                                     {#if key === "actions"}
                                         <div class="actions">
                                             <Button
@@ -691,6 +695,10 @@
     }
 
     .data-table th.header-actions {
+        text-align: right;
+    }
+
+    .data-table td[data-column="actions"] {
         text-align: right;
     }
 </style>

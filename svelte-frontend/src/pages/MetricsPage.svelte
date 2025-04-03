@@ -4,17 +4,35 @@
     import { ChartBar } from "carbon-icons-svelte";
     import { metricsService } from "../services/metricsService";
     import { onMount } from "svelte";
+    import type { MetricsData } from "../types/metrics";
 
     let isMetricsOpen = false;
     let hasMetrics = false;
+    let metrics: MetricsData = {
+        totalOperations: 0,
+        averageDuration: 0,
+        operationTypes: {},
+    };
+
+    async function checkMetrics() {
+        try {
+            const data = await metricsService.getMetrics();
+            metrics = data;
+            hasMetrics = data.totalOperations > 0;
+        } catch (error) {
+            console.error("Error checking metrics:", error);
+            hasMetrics = false;
+        }
+    }
 
     onMount(() => {
-        // Check if we have any metrics
-        hasMetrics = metricsService.getMetrics().length > 0;
+        checkMetrics();
     });
 
     // Watch for changes in metrics
-    $: hasMetrics = metricsService.getMetrics().length > 0;
+    $: if (isMetricsOpen) {
+        checkMetrics();
+    }
 </script>
 
 <div class="metrics-page">
@@ -38,7 +56,7 @@
         </div>
     </div>
 
-    <MetricsPanel bind:open={isMetricsOpen} />
+    <MetricsPanel bind:open={isMetricsOpen} {metrics} />
 </div>
 
 <style>
