@@ -56,14 +56,7 @@
         }
     });
 
-    async function handleCreate(
-        event: CustomEvent<
-            Omit<
-                NFeIdentification,
-                "internal_key" | "created_at" | "updated_at"
-            >
-        >,
-    ): Promise<void> {
+    async function handleCreate(): Promise<void> {
         try {
             // Create item through your API
             // const newItem = await createItem(event.detail);
@@ -76,14 +69,7 @@
         }
     }
 
-    async function handleUpdate(
-        event: CustomEvent<
-            Omit<
-                NFeIdentification,
-                "internal_key" | "created_at" | "updated_at"
-            >
-        >,
-    ): Promise<void> {
+    async function handleUpdate(): Promise<void> {
         if (!editingItem) return;
         try {
             // Update item through your API
