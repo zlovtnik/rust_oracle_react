@@ -35,18 +35,6 @@ jobs:
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
 
-      - name: Install Oracle Instant Client
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libaio wget unzip
-          wget https://download.oracle.com/otn_software/linux/instantclient/211000/instantclient-basic-linux.x64-21.1.0.0.0.zip
-          unzip instantclient-basic-linux.x64-21.1.0.0.0.zip
-          sudo mkdir -p /opt/oracle
-          sudo mv instantclient_21_1 /opt/oracle/
-          sudo sh -c "echo /opt/oracle/instantclient_21_1 > /etc/ld.so.conf.d/oracle-instantclient.conf"
-          sudo ldconfig
-          echo "export LD_LIBRARY_PATH=/opt/oracle/instantclient_21_1:$LD_LIBRARY_PATH" >> $GITHUB_ENV
-
       - name: Build
         run: cargo build --verbose
 
