@@ -3,9 +3,9 @@ use crate::repositories::nfe_identification_repository::{
     NFeIdentificationRepository, RepositoryError,
 };
 use actix_web::{web, HttpResponse, Responder};
+use serde::{Deserialize, Serialize};
 use serde_json;
 use std::sync::Arc;
-use uuid::Uuid;
 
 pub async fn list_identifications(
     repo: web::Data<Arc<NFeIdentificationRepository>>,

@@ -5,6 +5,7 @@ use std::fmt;
 use uuid::Uuid;
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub enum RepositoryError {
     OracleError(oracle::Error),
     NotFound,

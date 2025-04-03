@@ -1,4 +1,4 @@
-use actix_web::{web, App, Error as ActixError, HttpServer, Result as ActixResult};
+use actix_web::{web, App, HttpServer};
 use dotenv::dotenv;
 use oracle::Connection;
 use std::env;
