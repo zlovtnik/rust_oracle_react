@@ -14,7 +14,7 @@ on:
 
 # Add permissions for artifact upload
 permissions:
-  contents: read
+  contents: write
   packages: write
 
 jobs:
@@ -48,7 +48,7 @@ jobs:
         run: npm run build
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v2
         with:
           name: svelte-frontend-build
           path: svelte-frontend/build/
