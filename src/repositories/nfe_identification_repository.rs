@@ -291,7 +291,14 @@ impl NFeIdentificationRepository {
             &identification.proc_emi,
             &identification.ver_proc,
         ]) {
-            Ok(_) => println!("SQL execution successful"),
+            Ok(_) => {
+                println!("SQL execution successful");
+                // Commit the transaction
+                if let Err(e) = self.conn.commit() {
+                    eprintln!("Failed to commit transaction: {:?}", e);
+                    return Err(RepositoryError::OracleError(e));
+                }
+            }
             Err(e) => {
                 eprintln!("SQL execution failed: {:?}", e);
                 return Err(RepositoryError::OracleError(e));
@@ -453,9 +460,16 @@ impl NFeIdentificationRepository {
             &identification.ver_proc,
             &uuid_hex,
         ]) {
-            Ok(_) => println!("Update executed successfully"),
+            Ok(_) => {
+                println!("Update SQL execution successful");
+                // Commit the transaction
+                if let Err(e) = self.conn.commit() {
+                    eprintln!("Failed to commit transaction: {:?}", e);
+                    return Err(RepositoryError::OracleError(e));
+                }
+            }
             Err(e) => {
-                println!("Update execution failed: {:?}", e);
+                eprintln!("Update SQL execution failed: {:?}", e);
                 return Err(RepositoryError::OracleError(e));
             }
         }
@@ -576,16 +590,21 @@ impl NFeIdentificationRepository {
         let uuid_hex = uuid.to_string().replace("-", "");
         println!("Formatted UUID hex: {}", uuid_hex);
 
-        let sql = "DELETE FROM nfe_identifications WHERE INTERNALKEY = HEXTORAW(:1)";
-        let mut stmt = self.conn.statement(sql).build()?;
+        let delete_sql = "DELETE FROM nfe_identifications WHERE INTERNALKEY = HEXTORAW(:1)";
+        let mut stmt = self.conn.statement(delete_sql).build()?;
 
         match stmt.execute(&[&uuid_hex]) {
             Ok(_) => {
-                println!("Delete executed successfully");
+                println!("Delete SQL execution successful");
+                // Commit the transaction
+                if let Err(e) = self.conn.commit() {
+                    eprintln!("Failed to commit transaction: {:?}", e);
+                    return Err(RepositoryError::OracleError(e));
+                }
                 Ok(())
             }
             Err(e) => {
-                println!("Delete execution failed: {:?}", e);
+                eprintln!("Delete SQL execution failed: {:?}", e);
                 Err(RepositoryError::OracleError(e))
             }
         }
