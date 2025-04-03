@@ -22,7 +22,30 @@
     } from "../services/api";
     import type { NFeIdentification } from "../types/nfeTypes";
 
-    export let navigateTo: (path: string) => void;
+    interface FormData {
+        natOp: string;
+        cUF: string;
+        cNF: string;
+        mod_: string;
+        serie: string;
+        nNF: string;
+        dEmi: string;
+        dhEmi: string;
+        tpNF: string;
+        idDest: string;
+        cMunFG: string;
+        tpImp: string;
+        tpEmis: string;
+        cDV: string;
+        tpAmb: string;
+        finNFe: string;
+        indFinal: string;
+        indPres: string;
+        procEmi: string;
+        verProc: string;
+        created_at: string;
+        updated_at: string;
+    }
 
     let searchQuery = "";
     let isFilterPanelOpen = false;
@@ -40,7 +63,23 @@
         nNF: "",
         tpNF: "",
         dhEmi: "",
-    };
+        cUF: "",
+        cNF: "",
+        mod_: "",
+        serie: "",
+        dEmi: "",
+        idDest: "",
+        cMunFG: "",
+        tpImp: "",
+        tpEmis: "",
+        cDV: "",
+        tpAmb: "",
+        finNFe: "",
+        indFinal: "",
+        indPres: "",
+        procEmi: "",
+        verProc: "",
+    } as FormData;
 
     interface TableRow {
         id: string;
@@ -84,45 +123,82 @@
             }) as TableRow,
     );
 
-    function clearFilters() {
+    function clearFilters(): void {
         filters = {
             natOp: "",
             nNF: "",
             tpNF: "",
             dhEmi: "",
-        };
+            cUF: "",
+            cNF: "",
+            mod_: "",
+            serie: "",
+            dEmi: "",
+            idDest: "",
+            cMunFG: "",
+            tpImp: "",
+            tpEmis: "",
+            cDV: "",
+            tpAmb: "",
+            finNFe: "",
+            indFinal: "",
+            indPres: "",
+            procEmi: "",
+            verProc: "",
+        } as FormData;
     }
 
     onMount(async () => {
         try {
             loading = true;
             items = await fetchIdentifications();
-        } catch (err) {
-            error = err instanceof Error ? err.message : "Failed to load items";
+        } catch (error: unknown) {
+            const err = error as Error;
+            error = err.message || "Failed to load items";
         } finally {
             loading = false;
         }
     });
 
-    async function handleCreate(event: CustomEvent) {
+    async function handleCreate(
+        event: CustomEvent<
+            Omit<
+                NFeIdentification,
+                "internal_key" | "created_at" | "updated_at"
+            >
+        >,
+    ): Promise<void> {
         try {
-            const formData = event.detail;
-            const newItem = await createIdentification(formData);
+            const newItem = await createIdentification({
+                ...event.detail,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+            });
             items = [...items, newItem];
             isFormModalOpen = false;
-        } catch (err) {
-            error =
-                err instanceof Error ? err.message : "Failed to create item";
+        } catch (error: unknown) {
+            const err = error as Error;
+            error = err.message || "Failed to create item";
         }
     }
 
-    async function handleUpdate(event: CustomEvent) {
+    async function handleUpdate(
+        event: CustomEvent<
+            Omit<
+                NFeIdentification,
+                "internal_key" | "created_at" | "updated_at"
+            >
+        >,
+    ): Promise<void> {
         if (!editingItem?.internal_key) return;
         try {
-            const formData = event.detail;
             const updatedItem = await updateIdentification(
                 editingItem.internal_key,
-                formData,
+                {
+                    ...editingItem,
+                    ...event.detail,
+                    updated_at: new Date().toISOString(),
+                },
             );
             items = items.map((item) =>
                 item.internal_key === updatedItem.internal_key
@@ -131,26 +207,26 @@
             );
             isFormModalOpen = false;
             editingItem = null;
-        } catch (err) {
-            error =
-                err instanceof Error ? err.message : "Failed to update item";
+        } catch (error: unknown) {
+            const err = error as Error;
+            error = err.message || "Failed to update item";
         }
     }
 
-    async function handleDelete() {
+    async function handleDelete(): Promise<void> {
         if (!itemToDelete) return;
         try {
             await deleteIdentification(itemToDelete);
             items = items.filter((item) => item.internal_key !== itemToDelete);
             isDeleteModalOpen = false;
             itemToDelete = null;
-        } catch (err) {
-            error =
-                err instanceof Error ? err.message : "Failed to delete item";
+        } catch (error: unknown) {
+            const err = error as Error;
+            error = err.message || "Failed to delete item";
         }
     }
 
-    function handleEdit(row: TableRow) {
+    function handleEdit(row: TableRow): void {
         const item = items.find((i) => i.internal_key === row.id);
         if (item) {
             editingItem = item;
@@ -158,7 +234,7 @@
         }
     }
 
-    function handleDeleteClick(row: TableRow) {
+    function handleDeleteClick(row: TableRow): void {
         itemToDelete = row.id;
         isDeleteModalOpen = true;
     }
