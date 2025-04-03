@@ -11,20 +11,37 @@
     import { fade } from "svelte/transition";
     import ItemForm from "../components/ItemForm.svelte";
     import { onMount } from "svelte";
+    import type { NFeIdentification } from "../types/nfeTypes";
 
     export let navigateTo: (path: string) => void;
 
+    interface TableRow {
+        id: string;
+        internal_key: string;
+        natOp: string;
+        nNF: string;
+        dhEmi: string;
+        tpNF: string;
+    }
+
     let searchQuery = "";
     let isFilterPanelOpen = false;
-    let editingItem: any = null;
+    let editingItem: NFeIdentification | null = null;
     let isFormModalOpen = false;
     let isDeleteModalOpen = false;
     let itemToDelete: string | null = null;
     let error: string | null = null;
     let loading = false;
-    let items: any[] = [];
-    let filteredRows: any[] = [];
-    let headers: any[] = [];
+    let items: NFeIdentification[] = [];
+    let filteredRows: TableRow[] = [];
+    let headers = [
+        { key: "internal_key", value: "Internal Key", empty: false },
+        { key: "natOp", value: "Nature of Operation", empty: false },
+        { key: "nNF", value: "NF Number", empty: false },
+        { key: "dhEmi", value: "Issue Date", empty: false },
+        { key: "tpNF", value: "Type", empty: false },
+        { key: "actions", value: "Actions", empty: false },
+    ];
 
     onMount(async () => {
         try {
@@ -39,11 +56,17 @@
         }
     });
 
-    async function handleCreate(event: CustomEvent) {
+    async function handleCreate(
+        event: CustomEvent<
+            Omit<
+                NFeIdentification,
+                "internal_key" | "created_at" | "updated_at"
+            >
+        >,
+    ): Promise<void> {
         try {
-            const formData = event.detail;
             // Create item through your API
-            // const newItem = await createItem(formData);
+            // const newItem = await createItem(event.detail);
             // items = [...items, newItem];
             isFormModalOpen = false;
             navigateTo("/ide"); // Refresh the page
@@ -53,17 +76,22 @@
         }
     }
 
-    async function handleUpdate(event: CustomEvent) {
+    async function handleUpdate(
+        event: CustomEvent<
+            Omit<
+                NFeIdentification,
+                "internal_key" | "created_at" | "updated_at"
+            >
+        >,
+    ): Promise<void> {
         if (!editingItem) return;
         try {
-            const formData = {
-                ...event.detail,
-                internal_key: editingItem.internal_key,
-                created_at: editingItem.created_at,
-                updated_at: editingItem.updated_at,
-            };
             // Update item through your API
-            // const updatedItem = await updateItem(editingItem.internal_key, formData);
+            // const updatedItem = await updateItem(editingItem.internal_key, {
+            //     ...editingItem,
+            //     ...event.detail,
+            //     updated_at: new Date().toISOString()
+            // });
             // items = items.map((item) =>
             //     item.internal_key === updatedItem.internal_key ? updatedItem : item
             // );
@@ -76,7 +104,7 @@
         }
     }
 
-    async function handleDelete() {
+    async function handleDelete(): Promise<void> {
         if (!itemToDelete) return;
         try {
             // Delete item through your API
@@ -91,12 +119,12 @@
         }
     }
 
-    function handleEdit(item: any) {
+    function handleEdit(item: NFeIdentification): void {
         editingItem = item;
         isFormModalOpen = true;
     }
 
-    function handleDeleteClick(item: any) {
+    function handleDeleteClick(item: NFeIdentification): void {
         itemToDelete = item.internal_key;
         isDeleteModalOpen = true;
     }
