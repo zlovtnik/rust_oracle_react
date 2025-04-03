@@ -80,13 +80,6 @@
         }
     });
 
-    // Add a function to handle navigation after successful operations
-    function handleOperationSuccess() {
-        // Refresh the current page
-        navigateTo("/ide");
-    }
-
-    // Update the success handlers to use navigation
     async function handleCreate(event: CustomEvent) {
         try {
             const formData = event.detail;
@@ -94,7 +87,7 @@
             const newItem = await createIdentification(formData);
             items = [...items, newItem];
             isFormModalOpen = false;
-            handleOperationSuccess();
+            navigateTo("/ide"); // Refresh the page
         } catch (err) {
             error =
                 err instanceof Error ? err.message : "Failed to create item";
@@ -122,7 +115,7 @@
             );
             isFormModalOpen = false;
             editingItem = null;
-            handleOperationSuccess();
+            navigateTo("/ide"); // Refresh the page
         } catch (err) {
             error =
                 err instanceof Error ? err.message : "Failed to update item";
@@ -136,7 +129,7 @@
             items = items.filter((item) => item.internal_key !== itemToDelete);
             isDeleteModalOpen = false;
             itemToDelete = null;
-            handleOperationSuccess();
+            navigateTo("/ide"); // Refresh the page
         } catch (err) {
             error =
                 err instanceof Error ? err.message : "Failed to delete item";
