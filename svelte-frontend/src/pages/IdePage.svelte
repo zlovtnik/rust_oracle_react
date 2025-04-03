@@ -20,6 +20,8 @@
         deleteIdentification,
     } from "../services/api";
 
+    export let navigateTo: (path: string) => void;
+
     // State variables
     let items: NFeIdentification[] = [];
     let editingItem: NFeIdentification | null = null;
