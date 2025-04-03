@@ -24,20 +24,6 @@ jobs:
     name: Build and Test
     runs-on: ubuntu-latest
 
-    services:
-      oracle:
-        image: container-registry.oracle.com/database/express:latest
-        env:
-          ORACLE_PWD: oracle
-          ORACLE_CHARACTERSET: AL32UTF8
-        ports:
-          - 1521:1521
-        options: >-
-          --health-cmd healthcheck.sh
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
     steps:
       - uses: actions/checkout@v3
 
