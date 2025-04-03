@@ -22,7 +22,6 @@ export interface NFeIdentification {
     procEmi: string;
     verProc: string;
     dhCont?: string;
-    xJust?: string;
     created_at: string;
     updated_at: string;
 } 

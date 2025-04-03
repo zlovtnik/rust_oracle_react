@@ -1,123 +1,157 @@
+use crate::handlers::common::{ErrorResponse, PaginationResponse};
 use crate::models::nfe_identification::{CreateNFeIdentification, NFeIdentification};
-use crate::repositories::nfe_identification_repository::{
-    NFeIdentificationRepository, RepositoryError,
-};
-use actix_web::{web, HttpResponse, Responder};
-use serde_json;
+use crate::repositories::nfe_identification_repository::NFeIdentificationRepository;
+use actix_web::http::StatusCode;
+use actix_web::web::Json;
+use actix_web::web::{self, Query};
+use actix_web::{delete, get, post, put, HttpResponse, Responder};
+use serde::Deserialize;
 use std::sync::Arc;
+use tracing::{error, info, instrument};
 
+pub fn init_routes(cfg: &mut web::ServiceConfig) {
+    cfg.service(
+        web::scope("/api")
+            .service(list_identifications)
+            .service(get_identification)
+            .service(create_identification)
+            .service(update_identification)
+            .service(delete_identification),
+    );
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ListQuery {
+    #[serde(default = "default_page")]
+    pub page: u32,
+    #[serde(default = "default_page_size")]
+    pub page_size: u32,
+    #[serde(default)]
+    pub nat_op: Option<String>,
+    #[serde(default)]
+    pub n_nf: Option<String>,
+    #[serde(default)]
+    pub tp_nf: Option<String>,
+    #[serde(default)]
+    pub dh_emi: Option<String>,
+    #[serde(default)]
+    pub search: Option<String>,
+}
+
+fn default_page() -> u32 {
+    1
+}
+
+fn default_page_size() -> u32 {
+    50
+}
+
+#[get("/nfe-identifications")]
+#[instrument(skip(repo))]
 pub async fn list_identifications(
     repo: web::Data<Arc<NFeIdentificationRepository>>,
+    query: Query<ListQuery>,
 ) -> impl Responder {
-    match repo.find_all().await {
-        Ok(identifications) => HttpResponse::Ok().json(identifications),
+    info!(
+        "Listing NFe identifications with pagination - page: {}, page_size: {}",
+        query.page, query.page_size
+    );
+
+    match repo
+        .find_all(
+            query.page,
+            query.page_size,
+            query.nat_op.clone(),
+            query.n_nf.clone(),
+            query.tp_nf.clone(),
+            query.dh_emi.clone(),
+            query.search.clone(),
+        )
+        .await
+    {
+        Ok((identifications, total_count)) => {
+            let total_pages = (total_count as f64 / query.page_size as f64).ceil() as u32;
+            HttpResponse::Ok().json(PaginationResponse {
+                data: identifications,
+                total: total_count,
+                current_page: query.page,
+                page_size: query.page_size,
+                total_pages,
+            })
+        }
         Err(e) => {
-            eprintln!("Error fetching identifications: {:?}", e);
-            HttpResponse::InternalServerError().json("Failed to fetch identifications")
+            error!("Failed to list NFe identifications: {}", e);
+            HttpResponse::InternalServerError().json(ErrorResponse {
+                error: e.to_string(),
+            })
         }
     }
 }
 
+#[get("/api/identifications/{id}")]
 pub async fn get_identification(
     repo: web::Data<Arc<NFeIdentificationRepository>>,
-    path: web::Path<String>,
+    id: web::Path<String>,
 ) -> impl Responder {
-    let internal_key = path.into_inner();
-    match repo.find_by_id(&internal_key).await {
+    match repo.find_by_id(&id).await {
         Ok(Some(identification)) => HttpResponse::Ok().json(identification),
-        Ok(None) => HttpResponse::NotFound().json("Identification not found"),
+        Ok(None) => HttpResponse::NotFound().json(ErrorResponse {
+            error: "Identification not found".to_string(),
+        }),
         Err(e) => {
-            eprintln!("Error fetching identification: {:?}", e);
-            HttpResponse::InternalServerError().json("Failed to fetch identification")
+            error!("Failed to get identification: {}", e);
+            HttpResponse::InternalServerError().json(ErrorResponse {
+                error: "Failed to get identification".to_string(),
+            })
         }
     }
 }
 
+#[post("/api/identifications")]
 pub async fn create_identification(
     repo: web::Data<Arc<NFeIdentificationRepository>>,
     identification: web::Json<CreateNFeIdentification>,
 ) -> impl Responder {
-    // Log the received data
-    println!("Received identification data: {:?}", identification);
-    println!(
-        "Raw JSON: {}",
-        serde_json::to_string_pretty(&identification).unwrap()
-    );
-
-    // Validate required fields
-    if identification.c_uf.is_empty() {
-        println!("cUF field is empty");
-        return HttpResponse::BadRequest().json("cUF field is required");
-    }
-
-    // Log the parsed data
-    println!("Parsed cUF: {}", identification.c_uf);
-    println!("Parsed cNF: {}", identification.c_nf);
-    println!("Parsed dhEmi: {:?}", identification.dh_emi);
-
-    match repo.create(&identification.into_inner()).await {
-        Ok(created) => {
-            println!("Successfully created identification: {:?}", created);
-            HttpResponse::Created().json(created)
-        }
+    match repo.create(&identification).await {
+        Ok(created) => HttpResponse::Created().json(created),
         Err(e) => {
-            eprintln!("Error creating identification: {:?}", e);
-            HttpResponse::BadRequest().json(format!("Failed to create identification: {}", e))
+            error!("Failed to create identification: {}", e);
+            HttpResponse::InternalServerError().json(ErrorResponse {
+                error: "Failed to create identification".to_string(),
+            })
         }
     }
 }
 
+#[put("/api/identifications/{id}")]
 pub async fn update_identification(
     repo: web::Data<Arc<NFeIdentificationRepository>>,
-    path: web::Path<String>,
+    id: web::Path<String>,
     identification: web::Json<NFeIdentification>,
 ) -> impl Responder {
-    let internal_key = path.into_inner();
-    println!(
-        "Updating identification with internal_key: {}",
-        internal_key
-    );
-    println!("Update data: {:?}", identification);
-
-    match repo
-        .update(&internal_key, &identification.into_inner())
-        .await
-    {
-        Ok(updated) => {
-            println!("Successfully updated identification: {:?}", updated);
-            HttpResponse::Ok().json(updated)
-        }
+    match repo.update(&id, &identification).await {
+        Ok(updated) => HttpResponse::Ok().json(updated),
         Err(e) => {
-            eprintln!("Error updating identification: {:?}", e);
-            match e {
-                RepositoryError::NotFound => {
-                    HttpResponse::NotFound().json("Identification not found")
-                }
-                RepositoryError::InvalidUuid(msg) => {
-                    HttpResponse::BadRequest().json(format!("Invalid UUID: {}", msg))
-                }
-                RepositoryError::UpdateFailed => {
-                    HttpResponse::InternalServerError().json("Failed to update identification")
-                }
-                RepositoryError::OracleError(e) => {
-                    HttpResponse::InternalServerError().json(format!("Database error: {}", e))
-                }
-                _ => HttpResponse::InternalServerError().json("An unexpected error occurred"),
-            }
+            error!("Failed to update identification: {}", e);
+            HttpResponse::InternalServerError().json(ErrorResponse {
+                error: "Failed to update identification".to_string(),
+            })
         }
     }
 }
 
+#[delete("/api/identifications/{id}")]
 pub async fn delete_identification(
     repo: web::Data<Arc<NFeIdentificationRepository>>,
-    path: web::Path<String>,
+    id: web::Path<String>,
 ) -> impl Responder {
-    let internal_key = path.into_inner();
-    match repo.delete(&internal_key).await {
+    match repo.delete(&id).await {
         Ok(_) => HttpResponse::NoContent().finish(),
         Err(e) => {
-            eprintln!("Error deleting identification: {:?}", e);
-            HttpResponse::InternalServerError().json("Failed to delete identification")
+            error!("Failed to delete identification: {}", e);
+            HttpResponse::InternalServerError().json(ErrorResponse {
+                error: "Failed to delete identification".to_string(),
+            })
         }
     }
 }

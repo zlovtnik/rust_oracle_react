@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct NFeIdentification {
     pub internal_key: String,
     #[serde(rename = "cUF")]
@@ -16,6 +16,10 @@ pub struct NFeIdentification {
     pub n_nf: String,
     #[serde(rename = "dhEmi")]
     pub dh_emi: DateTime<Utc>,
+    #[serde(rename = "dhSaiEnt")]
+    pub dh_sai_ent: Option<DateTime<Utc>>,
+    #[serde(rename = "dhCont")]
+    pub dh_cont: Option<DateTime<Utc>>,
     #[serde(rename = "tpNF")]
     pub tp_nf: String,
     #[serde(rename = "idDest")]
@@ -40,6 +44,7 @@ pub struct NFeIdentification {
     pub proc_emi: String,
     #[serde(rename = "verProc")]
     pub ver_proc: String,
+    pub x_justificativa: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -58,6 +63,10 @@ pub struct CreateNFeIdentification {
     pub n_nf: String,
     #[serde(rename = "dhEmi")]
     pub dh_emi: DateTime<Utc>,
+    #[serde(rename = "dhSaiEnt")]
+    pub dh_sai_ent: Option<DateTime<Utc>>,
+    #[serde(rename = "dhCont")]
+    pub dh_cont: Option<DateTime<Utc>>,
     #[serde(rename = "tpNF")]
     pub tp_nf: String,
     #[serde(rename = "idDest")]

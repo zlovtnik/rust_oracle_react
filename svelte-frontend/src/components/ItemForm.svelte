@@ -34,7 +34,6 @@
     let procEmi = "";
     let verProc = "";
     let dhCont: string | undefined = undefined;
-    let xJust = "";
 
     const dispatch = createEventDispatcher();
 
@@ -64,7 +63,6 @@
         dhSaiEnt = initialValues.dhSaiEnt || "";
         indIntermed = initialValues.indIntermed || "";
         dhCont = initialValues.dhCont || "";
-        xJust = initialValues.xJust || "";
     } else if (open && !initialValues) {
         nNF = "";
         serie = "";
@@ -88,34 +86,35 @@
         dhSaiEnt = "";
         indIntermed = "";
         dhCont = "";
-        xJust = "";
     }
 
     async function handleSubmit() {
         console.log("Form submission started");
-
-        // Validate form first
         if (!validateForm()) {
             console.log("Form validation failed");
             return;
         }
+        console.log("Form validation passed");
 
-        // Format dates to ISO string
-        if (!dhEmi) {
-            console.error("dhEmi is required but empty");
-            alert("Issue Date is required");
-            return;
-        }
+        // Format dates properly with timezone
+        const formatDate = (
+            date: string | undefined,
+            originalDate?: string,
+        ) => {
+            if (!date) return undefined;
+            if (originalDate) {
+                // If we have an original date, preserve its time component
+                const original = new Date(originalDate);
+                const newDate = new Date(date);
+                newDate.setHours(original.getHours());
+                newDate.setMinutes(original.getMinutes());
+                newDate.setSeconds(original.getSeconds());
+                newDate.setMilliseconds(original.getMilliseconds());
+                return newDate.toISOString();
+            }
+            return new Date(date).toISOString();
+        };
 
-        const formattedDhEmi = new Date(dhEmi + "T00:00:00Z").toISOString();
-        const formattedDhSaiEnt = dhSaiEnt
-            ? new Date(dhSaiEnt + "T00:00:00Z").toISOString()
-            : undefined;
-        const formattedDhCont = dhCont
-            ? new Date(dhCont + "T00:00:00Z").toISOString()
-            : undefined;
-
-        // Create the form data with camelCase field names to match the database
         const formData = {
             cUF: cUF.trim(),
             cNF: cNF.trim(),
@@ -127,22 +126,27 @@
             natOp: natOp.trim(),
             mod_: mod_.trim(),
             serie: serie.trim(),
-            dhEmi: formattedDhEmi,
-            dhSaiEnt: formattedDhSaiEnt,
+            dhEmi: formatDate(dhEmi, initialValues?.dhEmi),
             idDest: idDest.trim(),
             tpImp: tpImp.trim(),
             tpEmis: tpEmis.trim(),
             tpAmb: tpAmb.trim(),
             indFinal: indFinal.trim(),
             indPres: indPres.trim(),
-            indIntermed: indIntermed.trim() || undefined,
             procEmi: procEmi.trim(),
             verProc: verProc.trim(),
-            dhCont: formattedDhCont,
-            xJust: xJust.trim() || undefined,
+            dhSaiEnt: dhSaiEnt ? formatDate(dhSaiEnt) : undefined,
+            indIntermed: indIntermed.trim() || undefined,
+            dhCont: dhCont ? formatDate(dhCont) : undefined,
         };
 
-        // Log the formatted data being sent
+        // Remove undefined values
+        Object.keys(formData).forEach(
+            (key) =>
+                formData[key as keyof typeof formData] === undefined &&
+                delete formData[key as keyof typeof formData],
+        );
+
         console.log("Formatted data being sent:", formData);
         console.log(
             "JSON stringified form data:",
@@ -395,12 +399,6 @@
                 required
             />
         </DatePicker>
-        <TextInput
-            labelText="Justification"
-            placeholder="Enter justification"
-            bind:value={xJust}
-            required
-        />
     </div>
 </Modal>
 

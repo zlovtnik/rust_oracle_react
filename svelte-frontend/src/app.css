@@ -1,8 +1,8 @@
 :root {
   --td-green: #004431;
   --td-green-light: #006b4f;
-  --violet: #9361e3;
-  --violet-light: #a981e6;
+  --violet: #FFD700;
+  --violet-light: #FFEB99;
   --accent-yellow: #FFD700;
   --accent-yellow-light: #FFEB99;
   --white: #ffffff;
@@ -27,12 +27,12 @@
 
 a {
   font-weight: 500;
-  color: var(--violet-light);
+  color: var(--accent-yellow-light);
   text-decoration: inherit;
 }
 
 a:hover {
-  color: var(--violet);
+  color: var(--accent-yellow);
 }
 
 /* Fix for svelte-routing Link components */
@@ -62,7 +62,7 @@ body {
 h1 {
   font-size: 3.2em;
   line-height: 1.1;
-  color: var(--white);
+  color: var(--accent-yellow);
 }
 
 .card {
@@ -89,12 +89,12 @@ button {
 }
 
 button:hover {
-  border-color: var(--violet);
+  border-color: var(--accent-yellow);
 }
 
 button:focus,
 button:focus-visible {
-  outline: 4px auto var(--violet);
+  outline: 4px auto var(--accent-yellow);
 }
 
 /* Custom theme overrides for Carbon components */
@@ -112,20 +112,20 @@ button:focus-visible {
 }
 
 :global(.bx--side-nav__link) {
-  color: var(--white);
+  color: var(--accent-yellow);
 }
 
 :global(.bx--side-nav__link:hover) {
   background-color: var(--dark-gray);
-  color: var(--violet-light);
+  color: var(--accent-yellow-light);
 }
 
 :global(.bx--btn--primary) {
-  background-color: var(--violet);
+  background-color: var(--accent-yellow);
 }
 
 :global(.bx--btn--primary:hover) {
-  background-color: var(--violet-light);
+  background-color: var(--accent-yellow-light);
 }
 
 :global(.bx--data-table) {
@@ -141,11 +141,11 @@ button:focus-visible {
 
 :global(.bx--data-table-header) {
   background-color: var(--td-green);
-  color: var(--white);
+  color: var(--accent-yellow);
 }
 
 :global(.bx--table-header-label) {
-  color: var(--white);
+  color: var(--accent-yellow);
 }
 
 :global(.bx--data-table-container) {
@@ -153,12 +153,12 @@ button:focus-visible {
 }
 
 :global(.bx--tabs__nav-link:hover) {
-  color: var(--violet);
+  color: var(--accent-yellow);
 }
 
 :global(.bx--pagination) {
   background-color: var(--dark-bg-light);
-  color: var(--white);
+  color: var(--accent-yellow);
   border-top: 1px solid var(--dark-gray);
 }
 
@@ -177,7 +177,7 @@ button:focus-visible {
 }
 
 :global(.bx--modal-header__heading) {
-  color: var(--white);
+  color: var(--accent-yellow);
 }
 
 :global(.bx--label) {
@@ -191,9 +191,9 @@ button:focus-visible {
 }
 
 :global(.bx--text-input:focus, .bx--text-area:focus, .bx--select-input:focus) {
-  border-bottom: 1px solid var(--violet);
+  border-bottom: 1px solid var(--accent-yellow);
 }
 
 :global(.bx--tab--selected .bx--tabs__nav-link) {
-  border-bottom-color: var(--violet);
+  border-bottom-color: var(--accent-yellow);
 }

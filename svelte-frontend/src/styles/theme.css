@@ -1,8 +1,8 @@
 :root {
     --td-green: #004431;
     --td-green-light: #006b4f;
-    --violet: #9361e3;
-    --violet-light: #a981e6;
+    --violet: #FFD700;
+    --violet-light: #FFEB99;
     --accent-yellow: #FFD700;
     --accent-yellow-light: #FFEB99;
     --white: #ffffff;
@@ -89,7 +89,7 @@ body {
 .hamburger-icon span {
     width: 100%;
     height: 2px;
-    background-color: var(--white);
+    background-color: var(--accent-yellow);
     transition: all 0.3s ease;
 }
 
@@ -106,7 +106,7 @@ body {
 }
 
 .app-title {
-    color: var(--white);
+    color: var(--accent-yellow);
     font-size: 1.25rem;
     font-weight: 600;
     margin: 0 1rem;
@@ -131,7 +131,7 @@ body {
 }
 
 .nav-link {
-    color: var(--white);
+    color: var(--accent-yellow);
     text-decoration: none;
     padding: 0.5rem 1rem;
     display: flex;
@@ -177,7 +177,7 @@ body {
 
 .hero-section h1 {
     font-size: 2.5rem;
-    color: var(--white);
+    color: var(--accent-yellow);
     margin-bottom: 1.5rem;
     line-height: 1.2;
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
@@ -186,7 +186,7 @@ body {
 .accent-bar {
     width: 120px;
     height: 4px;
-    background: linear-gradient(90deg, var(--td-green), var(--violet), var(--accent-yellow));
+    background: linear-gradient(90deg, var(--td-green), var(--accent-yellow));
     border-radius: 2px;
     margin-bottom: 1.5rem;
 }
@@ -225,7 +225,7 @@ body {
 .decoration-circle {
     position: absolute;
     border-radius: 50%;
-    background: radial-gradient(circle, var(--violet-light), transparent 70%);
+    background: radial-gradient(circle, var(--accent-yellow-light), transparent 70%);
 }
 
 .circle-1 {
@@ -263,7 +263,7 @@ body {
 
 .features-section h2 {
     text-align: center;
-    color: var(--white);
+    color: var(--accent-yellow);
     margin-bottom: 2rem;
     font-size: 2rem;
 }
@@ -284,12 +284,12 @@ body {
 }
 
 .feature-icon {
-    color: var(--violet);
+    color: var(--accent-yellow);
     margin-bottom: 1.5rem;
 }
 
 .feature-tile h3 {
-    color: var(--white);
+    color: var(--accent-yellow);
     margin-bottom: 1rem;
     font-size: 1.5rem;
 }
@@ -315,7 +315,7 @@ body {
 
 .stat-number {
     font-size: 2.5rem;
-    color: var(--violet);
+    color: var(--accent-yellow);
     font-weight: bold;
     margin-bottom: 0.5rem;
 }
@@ -344,7 +344,7 @@ body {
 }
 
 .section-title h2 {
-    color: var(--white);
+    color: var(--accent-yellow);
     margin: 0;
     font-size: 1.25rem;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
@@ -367,7 +367,7 @@ body {
     border-radius: 8px;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
     padding: 1.5rem;
-    border-top: 3px solid var(--violet);
+    border-top: 3px solid var(--accent-yellow);
     position: relative;
     overflow: hidden;
 }
@@ -391,14 +391,14 @@ body {
 
 /* Button styles */
 :global(.add-button) {
-    background-color: var(--violet);
+    background-color: var(--accent-yellow);
     padding: 0.5rem 1rem;
     font-size: 0.875rem;
     height: 2rem;
 }
 
 :global(.add-button:hover) {
-    background-color: var(--violet-light);
+    background-color: var(--accent-yellow-light);
 }
 
 /* Table styles */
@@ -416,7 +416,7 @@ body {
 }
 
 :global(.custom-table .bx--data-table-header__title) {
-    color: white;
+    color: var(--accent-yellow);
     font-size: 1.25rem;
     margin: 0;
 }
@@ -427,13 +427,13 @@ body {
 }
 
 :global(.custom-table .bx--table-header-label) {
-    color: var(--white);
+    color: var(--accent-yellow);
     font-weight: 600;
 }
 
 :global(.custom-table th) {
     background-color: var(--dark-gray);
-    color: var(--white);
+    color: var(--accent-yellow);
 }
 
 :global(.custom-table tr:hover td) {
@@ -465,11 +465,11 @@ body {
 }
 
 .edit-button {
-    color: var(--violet-light);
+    color: var(--accent-yellow-light);
 }
 
 .edit-button:hover {
-    background-color: rgba(147, 97, 227, 0.1);
+    background-color: rgba(255, 215, 0, 0.1);
 }
 
 .delete-button {

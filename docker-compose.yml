@@ -1,21 +1,19 @@
 version: '3.8'
 
 services:
-  oracle-db:
-    image: container-registry.oracle.com/database/free:latest
-    container_name: oracle-db
+  redis:
+    image: redis:latest
+    container_name: redis-cache
     ports:
-      - "1521:1521"
-    environment:
-      - ORACLE_PWD=oracle123  # Default password that will be changed
+      - "6379:6379"
     volumes:
-      - oracle_data:/opt/oracle/oradata
-      - ./scripts:/opt/oracle/scripts
+      - redis-data:/data
+    command: redis-server --appendonly yes
     healthcheck:
-      test: ["CMD", "sqlplus", "-L", "sys/oracle123@//localhost:1521/FREEPDB1 as sysdba", "@/opt/oracle/scripts/healthcheck.sql"]
-      interval: 30s
-      timeout: 10s
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
       retries: 5
 
 volumes:
-  oracle_data: 
+  redis-data: 

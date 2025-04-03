@@ -7,6 +7,8 @@ CREATE TABLE nfe_identifications (
     SERIE VARCHAR2(3) NOT NULL,
     NNF VARCHAR2(9) NOT NULL,
     DHEMI TIMESTAMP WITH TIME ZONE NOT NULL,
+    DHSAIENT TIMESTAMP WITH TIME ZONE,
+    DHCONT TIMESTAMP WITH TIME ZONE,
     TPNF VARCHAR2(1) NOT NULL,
     IDDEST VARCHAR2(1) NOT NULL,
     CMUNFG VARCHAR2(7) NOT NULL,
@@ -21,4 +23,36 @@ CREATE TABLE nfe_identifications (
     VERPROC VARCHAR2(20) NOT NULL,
     CREATEDAT TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     UPDATEDAT TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-); 
+);
+
+-- Create a sequence for generating UUIDs
+CREATE SEQUENCE uuid_seq START WITH 1 INCREMENT BY 1;
+
+-- Create a function to generate UUID
+CREATE OR REPLACE FUNCTION generate_uuid RETURN RAW IS
+    v_uuid RAW(16);
+BEGIN
+    SELECT SYS_GUID() INTO v_uuid FROM DUAL;
+    RETURN v_uuid;
+END;
+/
+
+-- Create a trigger to automatically set the UUID
+CREATE OR REPLACE TRIGGER nfe_identifications_bir
+BEFORE INSERT ON nfe_identifications
+FOR EACH ROW
+BEGIN
+    IF :NEW.INTERNALKEY IS NULL THEN
+        :NEW.INTERNALKEY := generate_uuid();
+    END IF;
+END;
+/
+
+-- Create a trigger to update the updated_at timestamp
+CREATE OR REPLACE TRIGGER nfe_identifications_bur
+BEFORE UPDATE ON nfe_identifications
+FOR EACH ROW
+BEGIN
+    :NEW.UPDATEDAT := CURRENT_TIMESTAMP;
+END;
+/ 

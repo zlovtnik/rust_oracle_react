@@ -9,11 +9,12 @@
         TextInput,
         Select,
         SelectItem,
+        Pagination,
     } from "carbon-components-svelte";
     import { Filter, Add, Edit, TrashCan, Close } from "carbon-icons-svelte";
     import { fade } from "svelte/transition";
     import ItemForm from "../components/ItemForm.svelte";
-    import { onMount } from "svelte";
+    import { onMount, onDestroy } from "svelte";
     import {
         fetchIdentifications,
         createIdentification,
@@ -21,33 +22,11 @@
         deleteIdentification,
     } from "../services/api";
     import type { NFeIdentification } from "../types/nfeTypes";
+    import { metricsService } from "../services/metricsService";
 
-    export const navigateTo: (path: string) => void = () => {};
+    const API_BASE_URL = "http://localhost:8080/api";
 
-    interface FormData {
-        natOp: string;
-        cUF: string;
-        cNF: string;
-        mod_: string;
-        serie: string;
-        nNF: string;
-        dEmi: string;
-        dhEmi: string;
-        tpNF: string;
-        idDest: string;
-        cMunFG: string;
-        tpImp: string;
-        tpEmis: string;
-        cDV: string;
-        tpAmb: string;
-        finNFe: string;
-        indFinal: string;
-        indPres: string;
-        procEmi: string;
-        verProc: string;
-        created_at: string;
-        updated_at: string;
-    }
+    export const navigateTo = (path: string) => {};
 
     let searchQuery = "";
     let isFilterPanelOpen = false;
@@ -57,7 +36,17 @@
     let itemToDelete: string | null = null;
     let errorMessage: string | null = null;
     let loading = false;
+    let currentPage = 1;
+    let totalCount = 0;
+    let hasMore = false;
     let items: NFeIdentification[] = [];
+    let visibleItems: NFeIdentification[] = [];
+    let listContainer: HTMLElement;
+
+    // Memory optimization settings
+    const PAGE_SIZE = 50; // Reduced page size for better memory management
+    const LOAD_THRESHOLD = 0.8; // Load more when scrolled 80% down
+    const MAX_ITEMS_IN_MEMORY = 1000; // Maximum number of items to keep in memory
 
     // Filter state
     let filters = {
@@ -65,23 +54,11 @@
         nNF: "",
         tpNF: "",
         dhEmi: "",
-        cUF: "",
-        cNF: "",
-        mod_: "",
-        serie: "",
-        dEmi: "",
-        idDest: "",
-        cMunFG: "",
-        tpImp: "",
-        tpEmis: "",
-        cDV: "",
-        tpAmb: "",
-        finNFe: "",
-        indFinal: "",
-        indPres: "",
-        procEmi: "",
-        verProc: "",
-    } as FormData;
+    };
+
+    // Pagination state
+    let pageSize = 50;
+    let pageSizes = [25, 50, 100, 200, 500];
 
     interface TableRow {
         id: string;
@@ -92,74 +69,215 @@
         tpNF: string;
     }
 
-    let headers = [
-        { key: "internal_key", value: "Internal Key", empty: false },
-        { key: "natOp", value: "Nature of Operation", empty: false },
-        { key: "nNF", value: "NF Number", empty: false },
-        { key: "dhEmi", value: "Issue Date", empty: false },
-        { key: "tpNF", value: "Type", empty: false },
-        { key: "actions", value: "Actions", empty: false },
+    interface TableHeader {
+        key: keyof TableRow | "actions";
+        label: string;
+    }
+
+    const headers: TableHeader[] = [
+        { key: "internal_key", label: "Internal Key" },
+        { key: "natOp", label: "Natureza da Operação" },
+        { key: "nNF", label: "Número NF" },
+        { key: "dhEmi", label: "Data Emissão" },
+        { key: "tpNF", label: "Tipo NF" },
+        { key: "actions", label: "Ações" },
     ];
 
-    $: filteredItems = items.filter((item) => {
-        const matchesNatOp =
-            !filters.natOp ||
-            item.natOp.toLowerCase().includes(filters.natOp.toLowerCase());
-        const matchesNNF = !filters.nNF || item.nNF.includes(filters.nNF);
-        const matchesTpNF = !filters.tpNF || item.tpNF === filters.tpNF;
-        const matchesDhEmi =
-            !filters.dhEmi || item.dhEmi.includes(filters.dhEmi);
+    // Memory efficient filtering - only filter visible items
+    function applyFilters(
+        itemsToFilter: NFeIdentification[],
+    ): NFeIdentification[] {
+        return itemsToFilter.filter((item) => {
+            // Apply search query across all fields
+            if (searchQuery) {
+                const query = searchQuery.toLowerCase();
+                const matchesSearch =
+                    (item.internal_key?.toLowerCase() || "").includes(query) ||
+                    (item.natOp?.toLowerCase() || "").includes(query) ||
+                    (item.nNF || "").includes(query) ||
+                    (item.dhEmi || "").includes(query) ||
+                    (item.tpNF || "").includes(query);
 
-        return matchesNatOp && matchesNNF && matchesTpNF && matchesDhEmi;
-    });
+                if (!matchesSearch) return false;
+            }
 
-    $: filteredRows = filteredItems.map(
+            // Apply specific filters
+            const matchesNatOp =
+                !filters.natOp ||
+                (item.natOp?.toLowerCase() || "").includes(
+                    filters.natOp.toLowerCase(),
+                );
+            const matchesNNF =
+                !filters.nNF || (item.nNF || "").includes(filters.nNF);
+            const matchesTpNF = !filters.tpNF || item.tpNF === filters.tpNF;
+            const matchesDhEmi =
+                !filters.dhEmi || (item.dhEmi || "").includes(filters.dhEmi);
+
+            return matchesNatOp && matchesNNF && matchesTpNF && matchesDhEmi;
+        });
+    }
+
+    // Reactive declarations moved to top level
+    $: filteredItems = applyFilters(visibleItems);
+    $: rows = filteredItems.map(
         (item) =>
             ({
                 id: item.internal_key,
                 internal_key: item.internal_key,
-                natOp: item.natOp,
-                nNF: item.nNF,
-                dhEmi: new Date(item.dhEmi).toLocaleDateString(),
+                natOp: item.natOp || "",
+                nNF: item.nNF || "",
+                dhEmi: item.dhEmi
+                    ? new Date(item.dhEmi).toLocaleDateString()
+                    : "",
                 tpNF: item.tpNF === "1" ? "Output" : "Input",
             }) as TableRow,
     );
 
-    function clearFilters(): void {
+    function clearFilters() {
         filters = {
             natOp: "",
             nNF: "",
             tpNF: "",
             dhEmi: "",
-            cUF: "",
-            cNF: "",
-            mod_: "",
-            serie: "",
-            dEmi: "",
-            idDest: "",
-            cMunFG: "",
-            tpImp: "",
-            tpEmis: "",
-            cDV: "",
-            tpAmb: "",
-            finNFe: "",
-            indFinal: "",
-            indPres: "",
-            procEmi: "",
-            verProc: "",
-        } as FormData;
+        };
+        searchQuery = "";
     }
 
-    onMount(async () => {
+    function handleFilterChange() {
+        // Filter the visible items based on the current filters
+        const filteredItems = items.filter((item) => {
+            return (
+                (!filters.natOp ||
+                    item.natOp
+                        ?.toLowerCase()
+                        .includes(filters.natOp.toLowerCase())) &&
+                (!filters.nNF || item.nNF?.toString().includes(filters.nNF)) &&
+                (!filters.tpNF ||
+                    item.tpNF?.toString().includes(filters.tpNF)) &&
+                (!filters.dhEmi || item.dhEmi?.includes(filters.dhEmi))
+            );
+        });
+        visibleItems = filteredItems.slice(0, pageSize);
+    }
+
+    function handlePaginationChange(e: CustomEvent) {
+        const { pageSize: newPageSize, page: newPage } = e.detail;
+        console.log(
+            `[UI] Pagination change: page ${newPage}, pageSize ${newPageSize}`,
+        );
+
+        // Ensure pageSize is always defined
+        const effectivePageSize = newPageSize || pageSize;
+        const effectivePage = newPage || 1;
+
+        // Reset to page 1 when changing page size
+        if (effectivePageSize !== pageSize) {
+            console.log(
+                `[UI] Page size changed from ${pageSize} to ${effectivePageSize}, resetting to page 1`,
+            );
+            // Update pageSize first
+            pageSize = effectivePageSize;
+            // Then reset other state
+            currentPage = 1;
+            items = [];
+            visibleItems = [];
+            // Force a state update
+            $: refreshItems();
+        } else if (effectivePage !== currentPage) {
+            console.log(
+                `[UI] Page changed from ${currentPage} to ${effectivePage}`,
+            );
+            currentPage = effectivePage;
+            refreshItems();
+        }
+    }
+
+    async function refreshItems() {
         try {
+            console.log(
+                `[UI] Refreshing items for page ${currentPage} with pageSize ${pageSize}`,
+            );
             loading = true;
-            items = await fetchIdentifications();
-        } catch (e: unknown) {
+            const response = await fetchIdentifications(currentPage, pageSize);
+
+            console.log(
+                `[UI] Received response with ${response.data.length} items`,
+            );
+
+            // Clear previous items if on page 1
+            if (currentPage === 1) {
+                console.log("[UI] Clearing previous items (page 1)");
+                items = [];
+            }
+
+            // Append new items
+            items = [...items, ...response.data];
+
+            // Update visible items immediately
+            const start = (currentPage - 1) * pageSize;
+            const end = start + pageSize;
+            visibleItems = items.slice(start, end);
+            console.log(
+                `[UI] Updated visible items: showing items ${start} to ${end} of ${items.length}`,
+            );
+
+            totalCount = response.totalCount;
+            hasMore = currentPage < response.totalPages;
+            errorMessage = null;
+            console.log(
+                `[UI] Updated state - total: ${totalCount}, hasMore: ${hasMore}`,
+            );
+        } catch (error) {
+            console.error("[UI] Error refreshing items:", error);
             errorMessage =
-                e instanceof Error ? e.message : "Failed to load items";
+                error instanceof Error ? error.message : "Failed to load items";
         } finally {
             loading = false;
+            console.log("[UI] Loading complete");
         }
+    }
+
+    onMount(() => {
+        let interval: number;
+        console.log("[UI] Component mounted");
+
+        // Initialize data
+        refreshItems().catch((error) => {
+            console.error("[UI] Initial data load failed:", error);
+            errorMessage =
+                error instanceof Error ? error.message : "Failed to load items";
+        });
+
+        // Add memory optimization cleanup
+        interval = window.setInterval(() => {
+            // Free memory for items not in the visible window
+            if (items.length > MAX_ITEMS_IN_MEMORY) {
+                console.log(
+                    `[UI] Memory cleanup: reducing items array size to ${MAX_ITEMS_IN_MEMORY}`,
+                );
+                // Keep only the most recent items
+                const startIndex = Math.max(
+                    0,
+                    items.length - MAX_ITEMS_IN_MEMORY,
+                );
+                items = items.slice(startIndex);
+                // Update visible items based on current page
+                const start = (currentPage - 1) * pageSize;
+                const end = start + pageSize;
+                visibleItems = items.slice(start, end);
+            }
+        }, 30000); // Check every 30 seconds
+
+        return () => {
+            console.log("[UI] Component cleanup");
+            clearInterval(interval);
+        };
+    });
+
+    onDestroy(() => {
+        // Clear large data structures on component destruction
+        items = [];
+        visibleItems = [];
     });
 
     async function handleCreate(
@@ -171,16 +289,20 @@
         >,
     ): Promise<void> {
         try {
+            const now = new Date().toISOString();
             const newItem = await createIdentification({
                 ...event.detail,
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
+                created_at: now,
+                updated_at: now,
             });
-            items = [...items, newItem];
+            items = [newItem, ...items];
+            visibleItems = items.slice(0, pageSize);
             isFormModalOpen = false;
-        } catch (e: unknown) {
+        } catch (error) {
             errorMessage =
-                e instanceof Error ? e.message : "Failed to create item";
+                error instanceof Error
+                    ? error.message
+                    : "Failed to create item";
         }
     }
 
@@ -202,16 +324,33 @@
                     updated_at: new Date().toISOString(),
                 },
             );
-            items = items.map((item) =>
-                item.internal_key === updatedItem.internal_key
-                    ? updatedItem
-                    : item,
+
+            // Only update the item in the arrays without creating new arrays
+            const itemIndex = items.findIndex(
+                (item) => item.internal_key === updatedItem.internal_key,
             );
+            if (itemIndex >= 0) {
+                items[itemIndex] = updatedItem;
+            }
+
+            const visibleIndex = visibleItems.findIndex(
+                (item) => item.internal_key === updatedItem.internal_key,
+            );
+            if (visibleIndex >= 0) {
+                visibleItems[visibleIndex] = updatedItem;
+            }
+
+            // Force svelte to recognize the change
+            items = [...items];
+            visibleItems = [...visibleItems];
+
             isFormModalOpen = false;
             editingItem = null;
-        } catch (e: unknown) {
+        } catch (error) {
             errorMessage =
-                e instanceof Error ? e.message : "Failed to update item";
+                error instanceof Error
+                    ? error.message
+                    : "Failed to update item";
         }
     }
 
@@ -219,19 +358,27 @@
         if (!itemToDelete) return;
         try {
             await deleteIdentification(itemToDelete);
+
+            // Remove from both arrays
             items = items.filter((item) => item.internal_key !== itemToDelete);
+            visibleItems = visibleItems.filter(
+                (item) => item.internal_key !== itemToDelete,
+            );
+
             isDeleteModalOpen = false;
             itemToDelete = null;
-        } catch (e: unknown) {
+        } catch (error) {
             errorMessage =
-                e instanceof Error ? e.message : "Failed to delete item";
+                error instanceof Error
+                    ? error.message
+                    : "Failed to delete item";
         }
     }
 
     function handleEdit(row: TableRow): void {
         const item = items.find((i) => i.internal_key === row.id);
         if (item) {
-            editingItem = item;
+            editingItem = { ...item }; // Create a copy to avoid reference issues
             isFormModalOpen = true;
         }
     }
@@ -239,6 +386,12 @@
     function handleDeleteClick(row: TableRow): void {
         itemToDelete = row.id;
         isDeleteModalOpen = true;
+    }
+
+    let selectedRow: TableRow | null = null;
+
+    function handleRowClick(row: TableRow) {
+        selectedRow = row;
     }
 </script>
 
@@ -306,7 +459,7 @@
                     />
                 </div>
                 <div class="filter-group">
-                    <Select labelText="Type" selected={filters.tpNF}>
+                    <Select labelText="Type" bind:selected={filters.tpNF}>
                         <SelectItem value="" text="All" />
                         <SelectItem value="1" text="Output" />
                         <SelectItem value="0" text="Input" />
@@ -333,42 +486,72 @@
         />
     {/if}
 
-    {#if loading}
+    <div class="table-summary">
+        <span class="items-count"
+            >{totalCount} total items (showing {filteredItems.length} items on page
+            {currentPage} of {Math.ceil(totalCount / pageSize)})</span
+        >
+    </div>
+
+    {#if loading && currentPage === 1}
         <DataTableSkeleton />
     {:else}
         <div class="table-container">
-            <DataTable
-                rows={filteredRows}
-                {headers}
-                sortable
-                zebra
-                size="medium"
-            >
-                <svelte:fragment slot="cell" let:cell let:row>
-                    {#if cell.key === "actions"}
-                        <div class="actions">
-                            <Button
-                                kind="ghost"
-                                size="small"
-                                icon={Edit}
-                                on:click={() => handleEdit(row)}
-                            >
-                                Edit
-                            </Button>
-                            <Button
-                                kind="ghost"
-                                size="small"
-                                icon={TrashCan}
-                                on:click={() => handleDeleteClick(row)}
-                            >
-                                Delete
-                            </Button>
-                        </div>
-                    {:else}
-                        {cell.value}
-                    {/if}
-                </svelte:fragment>
-            </DataTable>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        {#each headers as { key, label }}
+                            <th>{label}</th>
+                        {/each}
+                    </tr>
+                </thead>
+                <tbody>
+                    {#each rows as row}
+                        <tr
+                            class:selected={selectedRow?.id === row.id}
+                            on:click={() => handleRowClick(row)}
+                        >
+                            {#each headers as { key }}
+                                <td>
+                                    {#if key === "actions"}
+                                        <div class="actions">
+                                            <Button
+                                                kind="ghost"
+                                                size="small"
+                                                icon={Edit}
+                                                on:click={() => handleEdit(row)}
+                                            >
+                                                Edit
+                                            </Button>
+                                            <Button
+                                                kind="ghost"
+                                                size="small"
+                                                icon={TrashCan}
+                                                on:click={() =>
+                                                    handleDeleteClick(row)}
+                                            >
+                                                Delete
+                                            </Button>
+                                        </div>
+                                    {:else}
+                                        {row[key as keyof TableRow]}
+                                    {/if}
+                                </td>
+                            {/each}
+                        </tr>
+                    {/each}
+                </tbody>
+            </table>
+
+            <div class="pagination-container">
+                <Pagination
+                    page={currentPage}
+                    {pageSize}
+                    {pageSizes}
+                    totalItems={totalCount}
+                    on:change={handlePaginationChange}
+                />
+            </div>
         </div>
     {/if}
 
@@ -411,7 +594,7 @@
             BlinkMacSystemFont,
             system-ui,
             sans-serif;
-        background: #e6e6fa;
+        background: #121212;
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
     }
@@ -420,7 +603,7 @@
     .page-container {
         padding: 24px;
         min-height: 100vh;
-        background: #e6e6fa;
+        background: #121212;
     }
 
     .header {
@@ -429,13 +612,14 @@
         align-items: center;
         margin: -24px -24px 32px -24px;
         padding: 24px;
-        background: #004d40;
+        background: #004431;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
     }
 
     h1 {
         font-size: 24px;
         font-weight: 600;
-        color: #32cd32;
+        color: #ffd700;
         margin: 0;
         letter-spacing: -0.025em;
     }
@@ -446,217 +630,111 @@
         align-items: center;
     }
 
-    /* Button Styles */
-    :global(.bx--btn) {
-        height: 40px;
+    /* Table container */
+    .table-container {
+        margin: 1rem 0;
+        position: relative;
+        background: #1e1e1e;
         border-radius: 8px;
-        font-weight: 500;
-        font-size: 14px;
-        padding: 0 16px;
-        transition: all 0.15s ease;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
     }
 
-    :global(.bx--btn--ghost) {
-        background: #00695c;
-        border: 1px solid #32cd32;
-        color: #90ee90;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        font-size: 14px;
+    /* Table styles */
+    .data-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 1rem;
+        background-color: #1e1e1e;
     }
 
-    :global(.bx--btn--ghost:hover) {
-        background: #004d40;
-        border-color: #32cd32;
-        color: #32cd32;
+    .data-table th {
+        background-color: #004431;
+        color: #ffd700;
+        font-weight: 600;
+        padding: 0.75rem 1rem;
+        text-align: left;
+        border-bottom: 1px solid #ffd700;
     }
 
-    :global(.bx--btn--primary) {
-        background: #32cd32;
-        border: none;
-        color: #004d40;
-        display: flex;
-        align-items: center;
-        gap: 8px;
+    .data-table td {
+        padding: 0.75rem 1rem;
+        border-bottom: 1px solid #333333;
+        color: #ffffff;
     }
 
-    :global(.bx--btn--primary:hover) {
-        background: #90ee90;
+    .data-table tr {
+        transition: background-color 0.2s ease;
     }
 
-    /* Search Input */
-    :global(.bx--search) {
-        width: 320px;
+    .data-table tr:hover {
+        background-color: #333333;
+        cursor: pointer;
     }
 
-    :global(.bx--search-input) {
-        background: #6a0dad;
-        border: 1px solid #32cd32;
-        border-radius: 8px;
-        height: 40px;
-        color: #90ee90;
+    .data-table tr.selected {
+        background-color: #ffd700;
+        color: #121212;
     }
 
-    :global(.bx--search-input::placeholder) {
-        color: #90ee90;
+    /* Pagination styles */
+    .pagination-container {
+        margin-top: 1rem;
+        padding: 1rem;
+        background: #1e1e1e;
+        border-top: 1px solid #ffd700;
     }
 
-    /* Filter Panel */
+    /* Filter panel */
     .filter-panel {
-        background: #4b0082;
-        border: 1px solid #32cd32;
-        padding: 24px;
-        margin-bottom: 24px;
-        border-radius: 12px;
-    }
-
-    .filter-content {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-        gap: 20px;
+        background: #1e1e1e;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+        margin-bottom: 1rem;
+        padding: 1rem;
     }
 
     .filter-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 20px;
-        padding-bottom: 16px;
-        border-bottom: 1px solid #32cd32;
+        margin-bottom: 1rem;
     }
 
-    .filter-header h2 {
-        color: #32cd32;
-        margin: 0;
-        font-size: 18px;
-        font-weight: 500;
+    .filter-content {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
     }
 
-    /* Form Inputs */
-    :global(.bx--text-input),
-    :global(.bx--select-input) {
-        background: #6a0dad;
-        border: 1px solid #32cd32;
-        height: 40px;
-        border-radius: 8px;
-        color: #90ee90;
-        padding: 0 12px;
+    .filter-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
     }
 
-    :global(.bx--text-input::placeholder) {
-        color: #90ee90;
-    }
-
-    :global(.bx--text-input:focus),
-    :global(.bx--select-input:focus) {
-        border-color: #32cd32;
-        box-shadow: 0 0 0 3px rgba(50, 205, 50, 0.2);
-        outline: none;
-    }
-
-    :global(.bx--label) {
-        color: #32cd32;
-        font-weight: 500;
-        margin-bottom: 6px;
-        font-size: 14px;
-    }
-
-    :global(.bx--select-input option) {
-        background: #00695c;
-        color: #90ee90;
-    }
-
-    /* Data Table */
-    :global(.bx--data-table-container) {
-        background: #4b0082;
-        border-radius: 12px;
-        overflow: hidden;
-        border: 1px solid #32cd32;
-    }
-
-    :global(.bx--data-table) {
-        width: 100%;
-        border-collapse: separate;
-        border-spacing: 0;
-        font-size: 14px;
-        background: #4b0082;
-    }
-
-    :global(.bx--data-table th) {
-        background: #6a0dad;
-        color: #32cd32;
-        font-weight: 500;
-        text-align: left;
-        padding: 12px 16px;
-        font-size: 12px;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        border-bottom: 2px solid #32cd32;
-    }
-
-    :global(.bx--data-table td) {
-        padding: 12px 16px;
-        color: #90ee90;
-        background: #4b0082;
-        font-size: 14px;
-        line-height: 1.5;
-        border-bottom: 1px solid #32cd32;
-    }
-
-    :global(.bx--data-table tr:nth-child(odd) td) {
-        background: #4b0082;
-    }
-
-    :global(.bx--data-table tr:nth-child(even) td) {
-        background: #6a0dad;
-    }
-
-    :global(.bx--data-table tbody tr:hover td) {
-        background: #9400d3 !important;
-        color: #90ee90;
-    }
-
-    :global(.bx--table-toolbar) {
-        background: #6a0dad;
-        padding: 16px;
-        border-bottom: 1px solid #32cd32;
-    }
-
-    /* Table Actions */
+    /* Actions */
     .actions {
         display: flex;
-        gap: 8px;
+        gap: 0.5rem;
     }
 
-    :global(.bx--data-table tbody tr:hover td .actions button) {
-        background: #9400d3;
-        color: #90ee90;
-        border-color: #32cd32;
+    /* Table summary */
+    .table-summary {
+        margin: 1rem 0;
+        color: #ffd700;
+        font-size: 0.875rem;
     }
 
-    :global(.bx--data-table tbody tr:hover td .actions button:hover) {
-        background: #8b008b;
-        color: #90ee90;
-        border-color: #32cd32;
-    }
-
-    :global(.bx--data-table tbody tr:hover td .actions button svg) {
-        fill: #90ee90;
-    }
-
-    /* Checkbox */
-    :global(.bx--checkbox) {
-        border-color: #32cd32;
-    }
-
-    :global(.bx--checkbox:checked) {
-        background: #32cd32;
-        border-color: #32cd32;
-    }
-
-    /* Data Table Header */
-    :global(.bx--data-table-header) {
-        padding: 0;
+    /* Remove unused styles */
+    .loading-indicator,
+    .load-more-container,
+    .container,
+    .filters-panel,
+    .filters-panel.open,
+    .filter-actions,
+    .error-message,
+    .modal-content,
+    .modal-actions {
+        display: none;
     }
 </style>
