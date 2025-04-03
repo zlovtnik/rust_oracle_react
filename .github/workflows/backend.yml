@@ -1,0 +1,74 @@
+name: Rust Backend CI/CD
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/backend.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/backend.yml"
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build and Test
+    runs-on: ubuntu-latest
+
+    services:
+      oracle:
+        image: container-registry.oracle.com/database/express:latest
+        env:
+          ORACLE_PWD: oracle
+          ORACLE_CHARACTERSET: AL32UTF8
+        ports:
+          - 1521:1521
+        options: >-
+          --health-cmd healthcheck.sh
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install Oracle Instant Client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libaio1 wget unzip
+          wget https://download.oracle.com/otn_software/linux/instantclient/211000/instantclient-basic-linux.x64-21.1.0.0.0.zip
+          unzip instantclient-basic-linux.x64-21.1.0.0.0.zip
+          sudo mkdir -p /opt/oracle
+          sudo mv instantclient_21_1 /opt/oracle/
+          sudo sh -c "echo /opt/oracle/instantclient_21_1 > /etc/ld.so.conf.d/oracle-instantclient.conf"
+          sudo ldconfig
+          echo "export LD_LIBRARY_PATH=/opt/oracle/instantclient_21_1:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+
+      - name: Build
+        run: cargo build --verbose
+
+      - name: Run tests
+        run: cargo test --verbose
+
+      - name: Run clippy
+        run: cargo clippy -- -D warnings
+
+      - name: Run rustfmt
+        run: cargo fmt --all -- --check

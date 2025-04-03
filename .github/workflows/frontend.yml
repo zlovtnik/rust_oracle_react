@@ -1,0 +1,49 @@
+name: Svelte Frontend CI/CD
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "svelte-frontend/**"
+      - ".github/workflows/frontend.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "svelte-frontend/**"
+      - ".github/workflows/frontend.yml"
+
+jobs:
+  build:
+    name: Build and Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "18"
+          cache: "npm"
+
+      - name: Install dependencies
+        working-directory: ./svelte-frontend
+        run: npm ci
+
+      - name: Run type checking
+        working-directory: ./svelte-frontend
+        run: npm run check
+
+      - name: Run linting
+        working-directory: ./svelte-frontend
+        run: npm run lint
+
+      - name: Build
+        working-directory: ./svelte-frontend
+        run: npm run build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: svelte-frontend-build
+          path: svelte-frontend/build/

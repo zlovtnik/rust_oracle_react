@@ -1,0 +1,199 @@
+:root {
+  --td-green: #004431;
+  --td-green-light: #006b4f;
+  --violet: #9361e3;
+  --violet-light: #a981e6;
+  --accent-yellow: #FFD700;
+  --accent-yellow-light: #FFEB99;
+  --white: #ffffff;
+  --dark-bg: #121212;
+  --dark-bg-light: #1e1e1e;
+  --dark-gray: #333333;
+  --mid-gray: #555555;
+  --light-gray: #aaaaaa;
+  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  color-scheme: dark;
+  color: rgba(255, 255, 255, 0.9);
+  background-color: var(--dark-bg);
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  font-weight: 500;
+  color: var(--violet-light);
+  text-decoration: inherit;
+}
+
+a:hover {
+  color: var(--violet);
+}
+
+/* Fix for svelte-routing Link components */
+a,
+a:hover,
+a:active,
+a:focus {
+  text-decoration: none;
+  outline: none;
+}
+
+/* Make sure Link components display their children correctly */
+a {
+  display: inline-flex;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--dark-bg);
+  color: var(--white);
+  font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+h1 {
+  font-size: 3.2em;
+  line-height: 1.1;
+  color: var(--white);
+}
+
+.card {
+  padding: 2em;
+  background-color: var(--dark-bg-light);
+}
+
+#app {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+button {
+  border-radius: 8px;
+  border: 1px solid transparent;
+  padding: 0.6em 1.2em;
+  font-size: 1em;
+  font-weight: 500;
+  font-family: inherit;
+  background-color: var(--dark-gray);
+  cursor: pointer;
+  transition: border-color 0.25s;
+}
+
+button:hover {
+  border-color: var(--violet);
+}
+
+button:focus,
+button:focus-visible {
+  outline: 4px auto var(--violet);
+}
+
+/* Custom theme overrides for Carbon components */
+:global(.bx--header) {
+  background-color: var(--td-green);
+}
+
+:global(.bx--content) {
+  background-color: var(--dark-bg);
+}
+
+:global(.bx--side-nav) {
+  background-color: var(--dark-bg-light);
+  border-right: 1px solid var(--dark-gray);
+}
+
+:global(.bx--side-nav__link) {
+  color: var(--white);
+}
+
+:global(.bx--side-nav__link:hover) {
+  background-color: var(--dark-gray);
+  color: var(--violet-light);
+}
+
+:global(.bx--btn--primary) {
+  background-color: var(--violet);
+}
+
+:global(.bx--btn--primary:hover) {
+  background-color: var(--violet-light);
+}
+
+:global(.bx--data-table) {
+  background-color: var(--dark-bg-light);
+  color: var(--white);
+}
+
+:global(.bx--data-table th, .bx--data-table td) {
+  background-color: var(--dark-bg-light);
+  color: var(--white);
+  border-color: var(--dark-gray);
+}
+
+:global(.bx--data-table-header) {
+  background-color: var(--td-green);
+  color: var(--white);
+}
+
+:global(.bx--table-header-label) {
+  color: var(--white);
+}
+
+:global(.bx--data-table-container) {
+  background-color: var(--dark-bg-light);
+}
+
+:global(.bx--tabs__nav-link:hover) {
+  color: var(--violet);
+}
+
+:global(.bx--pagination) {
+  background-color: var(--dark-bg-light);
+  color: var(--white);
+  border-top: 1px solid var(--dark-gray);
+}
+
+:global(.bx--modal-container) {
+  background-color: var(--dark-bg-light);
+  color: var(--white);
+}
+
+:global(.bx--modal-content) {
+  background-color: var(--dark-bg-light);
+  color: var(--white);
+}
+
+:global(.bx--modal-header) {
+  background-color: var(--td-green);
+}
+
+:global(.bx--modal-header__heading) {
+  color: var(--white);
+}
+
+:global(.bx--label) {
+  color: var(--light-gray);
+}
+
+:global(.bx--text-input, .bx--text-area, .bx--select-input) {
+  background-color: var(--dark-bg);
+  color: var(--white);
+  border-bottom: 1px solid var(--mid-gray);
+}
+
+:global(.bx--text-input:focus, .bx--text-area:focus, .bx--select-input:focus) {
+  border-bottom: 1px solid var(--violet);
+}
+
+:global(.bx--tab--selected .bx--tabs__nav-link) {
+  border-bottom-color: var(--violet);
+}

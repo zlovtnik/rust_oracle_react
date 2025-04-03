@@ -1,0 +1,85 @@
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct NFeIdentification {
+    pub internal_key: String,
+    #[serde(rename = "cUF")]
+    pub c_uf: String,
+    #[serde(rename = "cNF")]
+    pub c_nf: String,
+    #[serde(rename = "natOp")]
+    pub nat_op: String,
+    pub mod_: String,
+    pub serie: String,
+    #[serde(rename = "nNF")]
+    pub n_nf: String,
+    #[serde(rename = "dhEmi")]
+    pub dh_emi: DateTime<Utc>,
+    #[serde(rename = "tpNF")]
+    pub tp_nf: String,
+    #[serde(rename = "idDest")]
+    pub id_dest: String,
+    #[serde(rename = "cMunFG")]
+    pub c_mun_fg: String,
+    #[serde(rename = "tpImp")]
+    pub tp_imp: String,
+    #[serde(rename = "tpEmis")]
+    pub tp_emis: String,
+    #[serde(rename = "cDV")]
+    pub c_dv: String,
+    #[serde(rename = "tpAmb")]
+    pub tp_amb: String,
+    #[serde(rename = "finNFe")]
+    pub fin_nfe: String,
+    #[serde(rename = "indFinal")]
+    pub ind_final: String,
+    #[serde(rename = "indPres")]
+    pub ind_pres: String,
+    #[serde(rename = "procEmi")]
+    pub proc_emi: String,
+    #[serde(rename = "verProc")]
+    pub ver_proc: String,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CreateNFeIdentification {
+    #[serde(rename = "cUF")]
+    pub c_uf: String,
+    #[serde(rename = "cNF")]
+    pub c_nf: String,
+    #[serde(rename = "natOp")]
+    pub nat_op: String,
+    pub mod_: String,
+    pub serie: String,
+    #[serde(rename = "nNF")]
+    pub n_nf: String,
+    #[serde(rename = "dhEmi")]
+    pub dh_emi: DateTime<Utc>,
+    #[serde(rename = "tpNF")]
+    pub tp_nf: String,
+    #[serde(rename = "idDest")]
+    pub id_dest: String,
+    #[serde(rename = "cMunFG")]
+    pub c_mun_fg: String,
+    #[serde(rename = "tpImp")]
+    pub tp_imp: String,
+    #[serde(rename = "tpEmis")]
+    pub tp_emis: String,
+    #[serde(rename = "cDV")]
+    pub c_dv: String,
+    #[serde(rename = "tpAmb")]
+    pub tp_amb: String,
+    #[serde(rename = "finNFe")]
+    pub fin_nfe: String,
+    #[serde(rename = "indFinal")]
+    pub ind_final: String,
+    #[serde(rename = "indPres")]
+    pub ind_pres: String,
+    #[serde(rename = "procEmi")]
+    pub proc_emi: String,
+    #[serde(rename = "verProc")]
+    pub ver_proc: String,
+}
