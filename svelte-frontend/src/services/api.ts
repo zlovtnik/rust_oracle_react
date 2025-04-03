@@ -1,10 +1,9 @@
-import type { NFeIdentification } from '../types/nfeTypes';
+import type { NFeIdentification } from '../types/nfe';
 import { metricsService } from './metricsService';
 
-const API_BASE_URL = 'http://localhost:8080';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 const BATCH_DELAY = 100; // 100ms delay for batching
-const DEFAULT_PAGE_SIZE = 50; // Default page size
 
 interface CacheEntry<T> {
     data: T;
@@ -12,14 +11,8 @@ interface CacheEntry<T> {
     totalCount: number;
 }
 
-interface PaginatedResponse<T> {
-    data: T[];
-    totalCount: number;
-    hasMore: boolean;
-}
-
 class ApiCache {
-    private cache: Map<string, CacheEntry<any>> = new Map();
+    private cache: Map<string, CacheEntry<unknown>> = new Map();
     private pendingUpdates: Set<string> = new Set();
     private updateTimeout: number | null = null;
 
@@ -62,9 +55,9 @@ class ApiCache {
 const apiCache = new ApiCache();
 
 // Debounce function for API calls
-function debounce<T>(fn: (...args: any[]) => Promise<T>, delay: number) {
+function debounce<T, Args extends unknown[]>(fn: (...args: Args) => Promise<T>, delay: number) {
     let timeoutId: number | null = null;
-    return async (...args: any[]): Promise<T> => {
+    return async (...args: Args): Promise<T> => {
         if (timeoutId) {
             window.clearTimeout(timeoutId);
         }
@@ -85,48 +78,75 @@ export interface FilterParams {
     searchQuery?: string;
 }
 
-export async function fetchIdentifications(
-    page: number,
-    pageSize: number,
-    filters?: FilterParams,
-): Promise<{ data: NFeIdentification[]; totalCount: number; totalPages: number }> {
-    try {
-        console.log(
-            `[API] Fetching identifications - page: ${page}, limit: ${pageSize}, filters:`,
-            filters,
-        );
+export interface QueryParams {
+    page?: number;
+    pageSize?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+    filters?: Record<string, string>;
+}
 
-        // Build query parameters
-        const params = new URLSearchParams({
-            page: page.toString(),
-            page_size: pageSize.toString(),
+interface ApiResponse<T> {
+    data: T;
+    total: number;
+    page: number;
+    pageSize: number;
+}
+
+export async function fetchNFeIdentifications(params: QueryParams = {}): Promise<ApiResponse<NFeIdentification[]>> {
+    const queryString = new URLSearchParams();
+
+    if (params.page) queryString.append('page', params.page.toString());
+    if (params.pageSize) queryString.append('pageSize', params.pageSize.toString());
+    if (params.sortBy) queryString.append('sortBy', params.sortBy);
+    if (params.sortOrder) queryString.append('sortOrder', params.sortOrder);
+    if (params.filters) {
+        Object.entries(params.filters).forEach(([key, value]) => {
+            queryString.append(key, value);
         });
+    }
 
-        // Add filter parameters if provided
-        if (filters) {
-            if (filters.natOp) params.append('nat_op', filters.natOp);
-            if (filters.nNF) params.append('n_nf', filters.nNF);
-            if (filters.tpNF) params.append('tp_nf', filters.tpNF);
-            if (filters.dhEmi) params.append('dh_emi', filters.dhEmi);
-            if (filters.searchQuery) params.append('search', filters.searchQuery);
-        }
+    const response = await fetch(`${API_BASE_URL}/api/identifications?${queryString}`);
+    if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    return response.json();
+}
 
-        const response = await fetch(
-            `${API_BASE_URL}/api/nfe-identifications?${params.toString()}`,
-        );
+export async function createNFeIdentification(data: NFeIdentification): Promise<NFeIdentification> {
+    const response = await fetch(`${API_BASE_URL}/api/identifications`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    return response.json();
+}
 
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
+export async function updateNFeIdentification(id: number, data: NFeIdentification): Promise<NFeIdentification> {
+    const response = await fetch(`${API_BASE_URL}/api/identifications/${id}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    return response.json();
+}
 
-        const data = await response.json();
-        console.log(
-            `[API] Received ${data.data.length} items out of ${data.totalCount} total`,
-        );
-        return data;
-    } catch (error) {
-        console.error('[API] Error fetching identifications:', error);
-        throw error;
+export async function deleteNFeIdentification(id: number): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/api/identifications/${id}`, {
+        method: 'DELETE',
+    });
+    if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
     }
 }
 
@@ -154,46 +174,6 @@ export const createIdentification = debounce(async (data: Partial<NFeIdentificat
         throw error;
     }
 }, BATCH_DELAY);
-
-export async function updateIdentification(
-    id: string,
-    data: Partial<NFeIdentification>,
-): Promise<NFeIdentification> {
-    try {
-        console.log("[API] Updating identification:", { id, data });
-        const response = await fetch(`${API_BASE_URL}/identifications/${id}`, {
-            method: "PUT",
-            headers: {
-                "Content-Type": "application/json",
-                Accept: "application/json",
-            },
-            body: JSON.stringify(data),
-        });
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error("[API] Update failed:", {
-                status: response.status,
-                statusText: response.statusText,
-                error: errorText,
-            });
-            throw new Error(
-                `Failed to update identification: ${response.status} ${response.statusText} - ${errorText}`,
-            );
-        }
-
-        const updatedItem = await response.json();
-        console.log("[API] Update successful:", updatedItem);
-        return updatedItem;
-    } catch (error) {
-        console.error("[API] Update error:", error);
-        metricsService.recordOperation("update_identification_error", {
-            duration: Date.now() - Date.now(),
-            details: { error: error instanceof Error ? error.message : "Unknown error" },
-        });
-        throw error;
-    }
-}
 
 export const deleteIdentification = debounce(async (id: string): Promise<void> => {
     const operationId = `delete_identification_${Date.now()}`;

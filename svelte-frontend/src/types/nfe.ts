@@ -1,0 +1,33 @@
+export interface NFeIdentification {
+    id: number;
+    internal_key: string;
+    natOp: string;
+    nNF: string;
+    tpNF: string;
+    dhEmi: string;
+    vNF: number;
+    vICMS: number;
+    vST: number;
+    vProd: number;
+    vFrete: number;
+    vSeg: number;
+    vDesc: number;
+    vII: number;
+    vIPI: number;
+    vPIS: number;
+    vCOFINS: number;
+    vOutro: number;
+    vTotTrib: number;
+    mod: string;
+    serie: string;
+    cNF: string;
+    cDV: string;
+    tpAmb: string;
+    finNFe: string;
+    indFinal: string;
+    indPres: string;
+    procEmi: string;
+    verProc: string;
+    dhCont?: string;
+    xJust?: string;
+} 

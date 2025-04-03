@@ -2,7 +2,6 @@
     import {
         Button,
         Search,
-        DataTable,
         DataTableSkeleton,
         InlineNotification,
         Modal,
@@ -16,17 +15,18 @@
     import ItemForm from "../components/ItemForm.svelte";
     import { onMount, onDestroy } from "svelte";
     import {
-        fetchIdentifications,
-        createIdentification,
-        updateIdentification,
-        deleteIdentification,
+        fetchNFeIdentifications,
+        createNFeIdentification,
+        updateNFeIdentification,
+        deleteNFeIdentification,
     } from "../services/api";
-    import type { NFeIdentification } from "../types/nfeTypes";
-    import { metricsService } from "../services/metricsService";
+    import type { NFeIdentification } from "../types/nfe";
 
-    const API_BASE_URL = "http://localhost:8080/api";
-
-    export const navigateTo = (path: string) => {};
+    export const navigateTo = (path: string) => {
+        if (typeof window !== "undefined") {
+            window.history.pushState({}, "", path);
+        }
+    };
 
     let searchQuery = "";
     let isFilterPanelOpen = false;
@@ -41,12 +41,6 @@
     let hasMore = false;
     let items: NFeIdentification[] = [];
     let visibleItems: NFeIdentification[] = [];
-    let listContainer: HTMLElement;
-
-    // Memory optimization settings
-    const PAGE_SIZE = 50; // Reduced page size for better memory management
-    const LOAD_THRESHOLD = 0.8; // Load more when scrolled 80% down
-    const MAX_ITEMS_IN_MEMORY = 1000; // Maximum number of items to keep in memory
 
     // Filter state
     let filters = {
@@ -143,23 +137,6 @@
         searchQuery = "";
     }
 
-    function handleFilterChange() {
-        // Filter the visible items based on the current filters
-        const filteredItems = items.filter((item) => {
-            return (
-                (!filters.natOp ||
-                    item.natOp
-                        ?.toLowerCase()
-                        .includes(filters.natOp.toLowerCase())) &&
-                (!filters.nNF || item.nNF?.toString().includes(filters.nNF)) &&
-                (!filters.tpNF ||
-                    item.tpNF?.toString().includes(filters.tpNF)) &&
-                (!filters.dhEmi || item.dhEmi?.includes(filters.dhEmi))
-            );
-        });
-        visibleItems = filteredItems.slice(0, pageSize);
-    }
-
     function handlePaginationChange(e: CustomEvent) {
         const { pageSize: newPageSize, page: newPage } = e.detail;
         console.log(
@@ -182,7 +159,7 @@
             items = [];
             visibleItems = [];
             // Force a state update
-            $: refreshItems();
+            refreshItems();
         } else if (effectivePage !== currentPage) {
             console.log(
                 `[UI] Page changed from ${currentPage} to ${effectivePage}`,
@@ -198,7 +175,10 @@
                 `[UI] Refreshing items for page ${currentPage} with pageSize ${pageSize}`,
             );
             loading = true;
-            const response = await fetchIdentifications(currentPage, pageSize);
+            const response = await fetchNFeIdentifications({
+                page: currentPage,
+                pageSize,
+            });
 
             console.log(
                 `[UI] Received response with ${response.data.length} items`,
@@ -221,8 +201,8 @@
                 `[UI] Updated visible items: showing items ${start} to ${end} of ${items.length}`,
             );
 
-            totalCount = response.totalCount;
-            hasMore = currentPage < response.totalPages;
+            totalCount = response.total;
+            hasMore = currentPage < Math.ceil(totalCount / pageSize);
             errorMessage = null;
             console.log(
                 `[UI] Updated state - total: ${totalCount}, hasMore: ${hasMore}`,
@@ -251,15 +231,12 @@
         // Add memory optimization cleanup
         interval = window.setInterval(() => {
             // Free memory for items not in the visible window
-            if (items.length > MAX_ITEMS_IN_MEMORY) {
+            if (items.length > 1000) {
                 console.log(
-                    `[UI] Memory cleanup: reducing items array size to ${MAX_ITEMS_IN_MEMORY}`,
+                    `[UI] Memory cleanup: reducing items array size to 1000`,
                 );
                 // Keep only the most recent items
-                const startIndex = Math.max(
-                    0,
-                    items.length - MAX_ITEMS_IN_MEMORY,
-                );
+                const startIndex = Math.max(0, items.length - 1000);
                 items = items.slice(startIndex);
                 // Update visible items based on current page
                 const start = (currentPage - 1) * pageSize;
@@ -281,19 +258,13 @@
     });
 
     async function handleCreate(
-        event: CustomEvent<
-            Omit<
-                NFeIdentification,
-                "internal_key" | "created_at" | "updated_at"
-            >
-        >,
+        event: CustomEvent<Omit<NFeIdentification, "internal_key">>,
     ): Promise<void> {
         try {
-            const now = new Date().toISOString();
-            const newItem = await createIdentification({
+            // Create a new item with a temporary internal_key
+            const newItem = await createNFeIdentification({
                 ...event.detail,
-                created_at: now,
-                updated_at: now,
+                internal_key: `temp_${Date.now()}`,
             });
             items = [newItem, ...items];
             visibleItems = items.slice(0, pageSize);
@@ -307,34 +278,25 @@
     }
 
     async function handleUpdate(
-        event: CustomEvent<
-            Omit<
-                NFeIdentification,
-                "internal_key" | "created_at" | "updated_at"
-            >
-        >,
+        event: CustomEvent<Omit<NFeIdentification, "internal_key">>,
     ): Promise<void> {
-        if (!editingItem?.internal_key) return;
+        if (!editingItem?.id) return;
         try {
-            const updatedItem = await updateIdentification(
-                editingItem.internal_key,
-                {
-                    ...editingItem,
-                    ...event.detail,
-                    updated_at: new Date().toISOString(),
-                },
-            );
+            const updatedItem = await updateNFeIdentification(editingItem.id, {
+                ...editingItem,
+                ...event.detail,
+            });
 
             // Only update the item in the arrays without creating new arrays
             const itemIndex = items.findIndex(
-                (item) => item.internal_key === updatedItem.internal_key,
+                (item) => item.id === updatedItem.id,
             );
             if (itemIndex >= 0) {
                 items[itemIndex] = updatedItem;
             }
 
             const visibleIndex = visibleItems.findIndex(
-                (item) => item.internal_key === updatedItem.internal_key,
+                (item) => item.id === updatedItem.id,
             );
             if (visibleIndex >= 0) {
                 visibleItems[visibleIndex] = updatedItem;
@@ -357,7 +319,10 @@
     async function handleDelete(): Promise<void> {
         if (!itemToDelete) return;
         try {
-            await deleteIdentification(itemToDelete);
+            const item = items.find((i) => i.internal_key === itemToDelete);
+            if (!item?.id) return;
+
+            await deleteNFeIdentification(item.id);
 
             // Remove from both arrays
             items = items.filter((item) => item.internal_key !== itemToDelete);
@@ -501,12 +466,12 @@
                 <thead>
                     <tr>
                         {#each headers as { key, label }}
-                            <th>{label}</th>
+                            <th class="header-{key}">{label}</th>
                         {/each}
                     </tr>
                 </thead>
                 <tbody>
-                    {#each rows as row}
+                    {#each rows as row (row.id)}
                         <tr
                             class:selected={selectedRow?.id === row.id}
                             on:click={() => handleRowClick(row)}
@@ -725,16 +690,7 @@
         font-size: 0.875rem;
     }
 
-    /* Remove unused styles */
-    .loading-indicator,
-    .load-more-container,
-    .container,
-    .filters-panel,
-    .filters-panel.open,
-    .filter-actions,
-    .error-message,
-    .modal-content,
-    .modal-actions {
-        display: none;
+    .data-table th.header-actions {
+        text-align: right;
     }
 </style>

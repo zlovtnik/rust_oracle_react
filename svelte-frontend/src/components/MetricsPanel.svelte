@@ -1,13 +1,9 @@
 <script lang="ts">
     import { onMount, onDestroy } from "svelte";
-    import {
-        metricsService,
-        type OperationMetric,
-    } from "../services/metricsService";
+    import { metricsService } from "../services/metricsService";
     import {
         Modal,
         DataTable,
-        Button,
         Tabs,
         Tab,
         TabContent,
@@ -19,21 +15,30 @@
         InlineNotification,
         Loading,
     } from "carbon-components-svelte";
-    import { Download, Reset } from "carbon-icons-svelte";
+    import { ChartBar } from "carbon-icons-svelte";
+    import type { MetricsData } from "../types/metrics";
 
     export let open = false;
+    export let metrics: MetricsData;
+    export let isLoading = false;
+    export let error: string | null = null;
 
-    let metrics: OperationMetric[] = [];
     let operationCounts: Record<string, number> = {};
-    let averageDurations: Record<string, number | null> = {};
     let refreshInterval: number;
-    let errorMessage: string | null = null;
-    let activeTab = "Summary";
-    let currentPage = 1;
-    let totalCount = 0;
-    let hasMore = false;
-    let isLoading = false;
-    let showLoadMorePrompt = false;
+    let activeTab = 0;
+
+    interface ChartData {
+        labels: string[];
+        values: number[];
+    }
+
+    interface TableRow {
+        id: string;
+        type: string;
+        timestamp: string;
+        duration: string;
+        details: string;
+    }
 
     // Set up headers for the operations table
     const headers = [
@@ -43,133 +48,63 @@
         { key: "details", value: "Details", empty: false },
     ];
 
-    // Memoize the rows transformation
-    let rowsCache: any[] = [];
-    let lastMetricsLength = 0;
+    let rowsCache: TableRow[] = [];
 
     function updateRowsCache() {
-        if (metrics.length !== lastMetricsLength) {
-            rowsCache = metrics.map((metric, index) => ({
-                id: String(index),
-                type: metric.type || "Unknown",
-                timestamp: metric.timestamp
-                    ? new Date(metric.timestamp).toLocaleString()
-                    : "N/A",
-                duration:
-                    metric.duration != null ? metric.duration.toFixed(2) : "-",
-                details: formatDetails(metric.details),
-            }));
-            lastMetricsLength = metrics.length;
+        if (metrics.operationTypes) {
+            rowsCache = Object.entries(metrics.operationTypes).map(
+                ([type, count], index) => ({
+                    id: String(index),
+                    type,
+                    timestamp: new Date().toLocaleString(),
+                    duration: metrics.averageDuration.toFixed(2),
+                    details: `Count: ${count}`,
+                }),
+            );
         }
     }
 
-    // Format details safely
-    function formatDetails(details: any): string {
-        if (!details) return "-";
-        try {
-            return typeof details === "object"
-                ? JSON.stringify(details, null, 2)
-                : String(details);
-        } catch (e) {
-            return "Error displaying details";
-        }
+    function formatChartData(data: MetricsData): ChartData {
+        return {
+            labels: Object.keys(data.operationTypes),
+            values: Object.values(data.operationTypes),
+        };
     }
 
-    // Get operation types for tabs
-    $: operationTypes = Object.keys(operationCounts).sort();
+    $: chartData = formatChartData(metrics);
 
     async function refreshMetrics() {
         try {
             isLoading = true;
-            const response =
-                await metricsService.getMetricsPaginated(currentPage);
-            if (JSON.stringify(response.data) !== JSON.stringify(metrics)) {
-                metrics = response.data;
-                totalCount = response.totalCount;
-                hasMore = response.hasMore;
-                operationCounts = metricsService.getOperationCounts();
-                updateRowsCache();
-
-                // Only calculate averages for the active tab
-                if (activeTab !== "Summary" && activeTab !== "All Operations") {
-                    averageDurations[activeTab] =
-                        metricsService.getAverageDuration(activeTab);
-                } else {
-                    operationTypes.forEach((type) => {
-                        averageDurations[type] =
-                            metricsService.getAverageDuration(type);
-                    });
-                }
-            }
-            errorMessage = null;
-        } catch (error) {
-            errorMessage =
+            const data = await metricsService.getMetrics();
+            metrics = data;
+            operationCounts = data.operationTypes;
+            updateRowsCache();
+            error = null;
+        } catch (err) {
+            error =
                 "Error refreshing metrics: " +
-                (error instanceof Error ? error.message : "Unknown error");
+                (err instanceof Error ? err.message : "Unknown error");
         } finally {
             isLoading = false;
         }
     }
 
-    async function loadMoreMetrics() {
-        if (hasMore) {
-            currentPage++;
-            await refreshMetrics();
-        }
-    }
-
-    function handleScroll(
-        e: CustomEvent<{
-            scrollTop: number;
-            scrollHeight: number;
-            clientHeight: number;
-        }>,
-    ) {
-        const { scrollTop, scrollHeight, clientHeight } = e.detail;
-        if (
-            scrollHeight - scrollTop <= clientHeight * 1.5 &&
-            !isLoading &&
-            hasMore
-        ) {
-            showLoadMorePrompt = true;
-        }
-    }
-
     function clearMetrics() {
         try {
-            metricsService.clearMetrics();
-            metrics = [];
+            metricsService.clearCache();
+            metrics = {
+                totalOperations: 0,
+                averageDuration: 0,
+                operationTypes: {},
+            };
             operationCounts = {};
-            averageDurations = {};
             rowsCache = [];
-            lastMetricsLength = 0;
-            errorMessage = null;
-        } catch (error) {
-            errorMessage =
+            error = null;
+        } catch (err) {
+            error =
                 "Error clearing metrics: " +
-                (error instanceof Error ? error.message : "Unknown error");
-        }
-    }
-
-    function downloadMetrics() {
-        try {
-            const dataStr =
-                "data:text/json;charset=utf-8," +
-                encodeURIComponent(JSON.stringify(metrics, null, 2));
-            const downloadAnchorNode = document.createElement("a");
-            downloadAnchorNode.setAttribute("href", dataStr);
-            downloadAnchorNode.setAttribute(
-                "download",
-                `metrics-${new Date().toISOString()}.json`,
-            );
-            document.body.appendChild(downloadAnchorNode);
-            downloadAnchorNode.click();
-            downloadAnchorNode.remove();
-            errorMessage = null;
-        } catch (error) {
-            errorMessage =
-                "Error downloading metrics: " +
-                (error instanceof Error ? error.message : "Unknown error");
+                (err instanceof Error ? err.message : "Unknown error");
         }
     }
 
@@ -196,23 +131,21 @@
     bind:open
     modalHeading="Operations Metrics"
     primaryButtonText="Close"
-    secondaryButtons={[{ text: "Clear Metrics" }, { text: "Download" }]}
+    secondaryButtons={[{ text: "Clear Metrics" }, { text: "Close" }]}
     size="lg"
     passiveModal
     on:click:button--secondary={(e) => {
         if (e.detail.text === "Clear Metrics") {
             clearMetrics();
-        } else if (e.detail.text === "Download") {
-            downloadMetrics();
         }
     }}
 >
-    {#if errorMessage}
+    {#if error}
         <InlineNotification
             kind="error"
             title="Error"
-            subtitle={errorMessage}
-            on:close={() => (errorMessage = null)}
+            subtitle={error}
+            on:close={() => (error = null)}
         />
     {/if}
 
@@ -223,9 +156,6 @@
     <Tabs bind:selected={activeTab}>
         <Tab label="Summary" />
         <Tab label="All Operations" />
-        {#each operationTypes as type}
-            <Tab label={type} />
-        {/each}
 
         <svelte:fragment slot="content">
             <TabContent>
@@ -246,20 +176,16 @@
                             </StructuredListRow>
                         </StructuredListHead>
                         <StructuredListBody>
-                            {#each operationTypes as type}
+                            {#each Object.entries(operationCounts) as [type, count]}
                                 <StructuredListRow>
                                     <StructuredListCell
                                         >{type}</StructuredListCell
                                     >
                                     <StructuredListCell
-                                        >{operationCounts[
-                                            type
-                                        ]}</StructuredListCell
+                                        >{count}</StructuredListCell
                                     >
                                     <StructuredListCell>
-                                        {averageDurations[type]
-                                            ? averageDurations[type].toFixed(2)
-                                            : "-"}
+                                        {metrics.averageDuration.toFixed(2)}
                                     </StructuredListCell>
                                 </StructuredListRow>
                             {/each}
@@ -271,33 +197,29 @@
             <TabContent>
                 <DataTable {headers} rows={rowsCache} sortable />
             </TabContent>
-
-            {#each operationTypes as type}
-                <TabContent>
-                    <DataTable
-                        {headers}
-                        rows={rowsCache.filter((row) => row.type === type)}
-                        sortable
-                    />
-                </TabContent>
-            {/each}
         </svelte:fragment>
     </Tabs>
+</Modal>
 
-    {#if showLoadMorePrompt && hasMore}
-        <div class="load-more-prompt">
-            <Button
-                kind="tertiary"
-                on:click={() => {
-                    showLoadMorePrompt = false;
-                    loadMoreMetrics();
-                }}
-            >
-                Load More ({totalCount - metrics.length} remaining)
-            </Button>
+<div class="metrics-panel">
+    {#if error}
+        <div class="error-message">{error}</div>
+    {:else if isLoading}
+        <div class="loading-indicator">Loading metrics...</div>
+    {:else}
+        <div class="chart-container">
+            <ChartBar class="chart-icon" />
+            <div class="chart-data">
+                {#each chartData.labels as label, i}
+                    <div class="metric-item">
+                        <span class="metric-label">{label}:</span>
+                        <span class="metric-value">{chartData.values[i]}</span>
+                    </div>
+                {/each}
+            </div>
         </div>
     {/if}
-</Modal>
+</div>
 
 <style>
     .metrics-summary {
@@ -333,16 +255,44 @@
         font-weight: 600;
     }
 
-    .load-more-prompt {
-        display: flex;
-        justify-content: center;
+    .metrics-panel {
+        background-color: #1e1e1e;
+        border-radius: 4px;
         padding: 1rem;
-        margin-top: 1rem;
-        border-top: 1px solid #32cd32;
+        margin: 1rem 0;
     }
 
-    :global(.bx--data-table-container) {
-        max-height: 60vh;
-        overflow-y: auto;
+    .chart-container {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .chart-data {
+        flex: 1;
+    }
+
+    .metric-item {
+        display: flex;
+        justify-content: space-between;
+        margin: 0.5rem 0;
+    }
+
+    .metric-label {
+        color: #ffd700;
+    }
+
+    .metric-value {
+        color: #ffffff;
+    }
+
+    .error-message {
+        color: #ff6b6b;
+        text-align: center;
+    }
+
+    .loading-indicator {
+        color: #ffd700;
+        text-align: center;
     }
 </style>

@@ -1,6 +1,5 @@
 <script lang="ts">
   import {
-    Content,
     Header,
     SideNav,
     SideNavItems,
@@ -26,32 +25,14 @@
 
   let isSideNavOpen = false;
   let currentPath = "/";
-  let windowWidth = 0;
 
   // Initialize the current path based on the window location
   if (typeof window !== "undefined") {
     currentPath = window.location.pathname || "/";
-    windowWidth = window.innerWidth;
 
     // Handle history navigation
     window.addEventListener("popstate", () => {
       currentPath = window.location.pathname || "/";
-    });
-
-    // Handle window resize
-    window.addEventListener("resize", () => {
-      windowWidth = window.innerWidth;
-      // Force menu visibility on resize
-      const menuTrigger = document.querySelector(
-        ".bx--header__menu-trigger",
-      ) as HTMLElement;
-      if (menuTrigger) {
-        menuTrigger.classList.remove("bx--header__menu-trigger--hidden");
-        menuTrigger.setAttribute("aria-hidden", "false");
-        menuTrigger.style.display = "block";
-        menuTrigger.style.visibility = "visible";
-        menuTrigger.style.opacity = "1";
-      }
     });
   }
 
@@ -69,21 +50,11 @@
     { path: "/metrics", name: "System Metrics", icon: ChartBar },
   ];
 
-  function toggleMenu() {
-    isSideNavOpen = !isSideNavOpen;
-  }
-
   // Custom navigation function that updates history and current path
   function navigateTo(path: string): void {
     if (typeof window !== "undefined") {
       window.history.pushState({}, "", path);
       currentPath = path;
-    }
-  }
-
-  function handleKeyDown(event: KeyboardEvent) {
-    if (event.key === "Enter" || event.key === " ") {
-      toggleMenu();
     }
   }
 
