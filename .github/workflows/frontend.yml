@@ -12,6 +12,11 @@ on:
       - "svelte-frontend/**"
       - ".github/workflows/frontend.yml"
 
+# Add permissions for artifact upload
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   build:
     name: Build and Test
