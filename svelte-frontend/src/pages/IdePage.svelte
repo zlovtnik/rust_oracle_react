@@ -22,6 +22,8 @@
     } from "../services/api";
     import type { NFeIdentification } from "../types/nfeTypes";
 
+    export let navigateTo: (path: string) => void;
+
     interface FormData {
         natOp: string;
         cUF: string;
