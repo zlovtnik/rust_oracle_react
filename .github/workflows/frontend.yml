@@ -33,7 +33,7 @@ jobs:
         run: npm run build
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v3.1.1
+        uses: actions/upload-artifact@v3.8.2
         with:
           name: svelte-frontend-build
           path: svelte-frontend/build/
