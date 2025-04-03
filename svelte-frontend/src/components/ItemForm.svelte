@@ -1,13 +1,10 @@
 <script lang="ts">
-    import { createEventDispatcher, onMount } from "svelte";
+    import { createEventDispatcher } from "svelte";
     import {
         Modal,
         TextInput,
-        TextArea,
         DatePicker,
         DatePickerInput,
-        Select,
-        SelectItem,
     } from "carbon-components-svelte";
     import type { NFeIdentification } from "../types/nfeTypes";
 
@@ -292,8 +289,13 @@
             required
         />
         <div class="bx--form-item">
-            <label class="bx--label">Type of NFe</label>
-            <select class="bx--select-input" bind:value={tpNF} required>
+            <label for="nfe-type" class="bx--label">Type of NFe</label>
+            <select
+                id="nfe-type"
+                class="bx--select-input"
+                bind:value={tpNF}
+                required
+            >
                 <option value="">Select a type</option>
                 <option value="0">Entry (0)</option>
                 <option value="1">Exit (1)</option>

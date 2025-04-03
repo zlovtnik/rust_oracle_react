@@ -7,8 +7,6 @@
         InlineNotification,
         Modal,
         DataTableSkeleton,
-        Pagination,
-        Tag,
     } from "carbon-components-svelte";
     import { Add, Edit, TrashCan } from "carbon-icons-svelte";
     import type { NFeIdentification } from "../types/nfeTypes";
@@ -30,11 +28,14 @@
     let itemToDelete: string | null = null;
     let loading = true;
     let error: string | null = null;
-    let rows: any[] = [];
-
-    // Pagination state
-    let pageSize = 10;
-    let page = 1;
+    let rows: Array<{
+        id: string;
+        cUF: string;
+        natOp: string;
+        nNF: string;
+        dhEmi: string;
+        actions: string;
+    }> = [];
 
     // Table headers for Carbon DataTable
     const headers = [
@@ -54,7 +55,7 @@
                     console.error("Item missing internal_key:", item);
                     return null;
                 }
-                const row = {
+                return {
                     id: item.internal_key,
                     cUF: item.cUF || "",
                     natOp: item.natOp || "",
@@ -62,11 +63,8 @@
                     dhEmi: item.dhEmi ? formatDate(item.dhEmi) : "",
                     actions: `actions-${item.internal_key}`,
                 };
-                console.log("Row data:", row);
-                return row;
             })
-            .filter(Boolean); // Remove any null rows
-        console.log("All rows:", rows);
+            .filter((row): row is NonNullable<typeof row> => row !== null);
     }
 
     // Load data on component mount
@@ -82,6 +80,13 @@
         }
     });
 
+    // Add a function to handle navigation after successful operations
+    function handleOperationSuccess() {
+        // Refresh the current page
+        navigateTo("/ide");
+    }
+
+    // Update the success handlers to use navigation
     async function handleCreate(event: CustomEvent) {
         try {
             const formData = event.detail;
@@ -89,6 +94,7 @@
             const newItem = await createIdentification(formData);
             items = [...items, newItem];
             isFormModalOpen = false;
+            handleOperationSuccess();
         } catch (err) {
             error =
                 err instanceof Error ? err.message : "Failed to create item";
@@ -116,6 +122,7 @@
             );
             isFormModalOpen = false;
             editingItem = null;
+            handleOperationSuccess();
         } catch (err) {
             error =
                 err instanceof Error ? err.message : "Failed to update item";
@@ -129,6 +136,7 @@
             items = items.filter((item) => item.internal_key !== itemToDelete);
             isDeleteModalOpen = false;
             itemToDelete = null;
+            handleOperationSuccess();
         } catch (err) {
             error =
                 err instanceof Error ? err.message : "Failed to delete item";
