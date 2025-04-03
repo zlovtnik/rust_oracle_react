@@ -1,8 +1,8 @@
 use crate::handlers::common::{ErrorResponse, PaginationResponse};
 use crate::models::nfe_identification::{CreateNFeIdentification, NFeIdentification};
-use crate::repositories::nfe_identification_repository::NFeIdentificationRepository;
-use actix_web::http::StatusCode;
-use actix_web::web::Json;
+use crate::repositories::nfe_identification_repository::{
+    NFeFilterParams, NFeIdentificationRepository,
+};
 use actix_web::web::{self, Query};
 use actix_web::{delete, get, post, put, HttpResponse, Responder};
 use serde::Deserialize;
@@ -32,7 +32,7 @@ pub struct ListQuery {
     pub n_nf: Option<String>,
     #[serde(default)]
     pub tp_nf: Option<String>,
-    #[serde(default)]
+    #[allow(dead_code)]
     pub dh_emi: Option<String>,
     #[serde(default)]
     pub search: Option<String>,
@@ -57,18 +57,16 @@ pub async fn list_identifications(
         query.page, query.page_size
     );
 
-    match repo
-        .find_all(
-            query.page,
-            query.page_size,
-            query.nat_op.clone(),
-            query.n_nf.clone(),
-            query.tp_nf.clone(),
-            query.dh_emi.clone(),
-            query.search.clone(),
-        )
-        .await
-    {
+    let params = NFeFilterParams {
+        page: query.page,
+        page_size: query.page_size,
+        sort_by: query.nat_op.clone(),
+        sort_order: query.n_nf.clone(),
+        filter: query.tp_nf.clone(),
+        search: query.search.clone(),
+    };
+
+    match repo.find_all(params).await {
         Ok((identifications, total_count)) => {
             let total_pages = (total_count as f64 / query.page_size as f64).ceil() as u32;
             HttpResponse::Ok().json(PaginationResponse {

@@ -8,6 +8,7 @@ use std::sync::Arc;
 use tracing::{error, info, Level};
 use tracing_subscriber::FmtSubscriber;
 
+mod errors;
 mod handlers;
 mod models;
 mod repositories;
@@ -20,8 +21,8 @@ async fn main() -> std::io::Result<()> {
     // Load environment variables from .env file
     dotenv().ok();
 
-    // Initialize tracing
-    let _subscriber = FmtSubscriber::builder()
+    // Initialize tracing subscriber
+    FmtSubscriber::builder()
         .with_max_level(Level::DEBUG)
         .with_target(false)
         .with_thread_ids(true)

@@ -1,42 +1,22 @@
+use crate::errors::RepositoryError;
 use crate::models::nfe_identification::{CreateNFeIdentification, NFeIdentification};
 use crate::services::cache_service::CacheService;
 use chrono::{DateTime, NaiveDateTime, Utc};
-use oracle::{sql_type::ToSql, Connection};
+use oracle::Connection;
 use redis::aio::ConnectionManager;
-use std::fmt;
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::{debug, error, info, instrument};
 use uuid::Uuid;
 
 #[derive(Debug)]
-#[allow(dead_code)]
-pub enum RepositoryError {
-    OracleError(oracle::Error),
-    NotFound,
-    CreationFailed,
-    UpdateFailed,
-    InvalidUuid(String),
-}
-
-impl fmt::Display for RepositoryError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            RepositoryError::OracleError(e) => write!(f, "Oracle error: {}", e),
-            RepositoryError::NotFound => write!(f, "Record not found"),
-            RepositoryError::CreationFailed => write!(f, "Failed to create record"),
-            RepositoryError::UpdateFailed => write!(f, "Failed to update record"),
-            RepositoryError::InvalidUuid(msg) => write!(f, "Invalid UUID: {}", msg),
-        }
-    }
-}
-
-impl std::error::Error for RepositoryError {}
-
-impl From<oracle::Error> for RepositoryError {
-    fn from(err: oracle::Error) -> Self {
-        RepositoryError::OracleError(err)
-    }
+pub struct NFeFilterParams {
+    pub page: u32,
+    pub page_size: u32,
+    pub sort_by: Option<String>,
+    pub sort_order: Option<String>,
+    pub filter: Option<String>,
+    pub search: Option<String>,
 }
 
 pub struct NFeIdentificationRepository {
@@ -55,30 +35,24 @@ impl NFeIdentificationRepository {
     #[instrument(skip(self))]
     pub async fn find_all(
         &self,
-        page: u32,
-        page_size: u32,
-        nat_op: Option<String>,
-        n_nf: Option<String>,
-        tp_nf: Option<String>,
-        dh_emi: Option<String>,
-        search: Option<String>,
+        params: NFeFilterParams,
     ) -> Result<(Vec<NFeIdentification>, u64), RepositoryError> {
         info!(
             "Fetching NFe identifications with pagination - page: {}, page_size: {}",
-            page, page_size
+            params.page, params.page_size
         );
 
         // Try to get from cache first
         let cache_key = format!(
-            "nfe:list:{}:{}:{}:{}:{}:{}:{}",
-            page,
-            page_size,
-            nat_op.as_deref().unwrap_or(""),
-            n_nf.as_deref().unwrap_or(""),
-            tp_nf.as_deref().unwrap_or(""),
-            dh_emi.as_deref().unwrap_or(""),
-            search.as_deref().unwrap_or("")
+            "nfe:list:{}:{}:{}:{}:{}:{}",
+            params.page,
+            params.page_size,
+            params.sort_by.as_deref().unwrap_or(""),
+            params.sort_order.as_deref().unwrap_or(""),
+            params.filter.as_deref().unwrap_or(""),
+            params.search.as_deref().unwrap_or("")
         );
+
         if let Ok(Some(cached)) = self
             .cache
             .get::<(Vec<NFeIdentification>, u64)>(&cache_key)
@@ -89,35 +63,30 @@ impl NFeIdentificationRepository {
         }
 
         // Calculate offset
-        let offset = (page - 1) * page_size;
+        let offset = (params.page - 1) * params.page_size;
 
         // Build WHERE clause for filters
         let mut where_clauses = Vec::new();
-        let mut params: Vec<(String, String)> = Vec::new();
+        let mut bind_params: Vec<(String, String)> = Vec::new();
 
-        if let Some(nat_op) = &nat_op {
-            where_clauses.push("NATOP LIKE :nat_op");
-            params.push(("nat_op".to_string(), format!("%{}%", nat_op)));
+        if let Some(sort_by) = &params.sort_by {
+            where_clauses.push("NATOP LIKE :sort_by");
+            bind_params.push(("sort_by".to_string(), format!("%{}%", sort_by)));
         }
 
-        if let Some(n_nf) = &n_nf {
-            where_clauses.push("NNF LIKE :n_nf");
-            params.push(("n_nf".to_string(), format!("%{}%", n_nf)));
+        if let Some(sort_order) = &params.sort_order {
+            where_clauses.push("NNF LIKE :sort_order");
+            bind_params.push(("sort_order".to_string(), format!("%{}%", sort_order)));
         }
 
-        if let Some(tp_nf) = &tp_nf {
-            where_clauses.push("TPNF = :tp_nf");
-            params.push(("tp_nf".to_string(), tp_nf.to_string()));
+        if let Some(filter) = &params.filter {
+            where_clauses.push("TPNF = :filter");
+            bind_params.push(("filter".to_string(), filter.to_string()));
         }
 
-        if let Some(dh_emi) = &dh_emi {
-            where_clauses.push("TO_CHAR(DHEMI, 'YYYY-MM-DD') = :dh_emi");
-            params.push(("dh_emi".to_string(), dh_emi.to_string()));
-        }
-
-        if let Some(search) = &search {
+        if let Some(search) = &params.search {
             where_clauses.push("(NATOP LIKE :search OR NNF LIKE :search OR TPNF LIKE :search)");
-            params.push(("search".to_string(), format!("%{}%", search)));
+            bind_params.push(("search".to_string(), format!("%{}%", search)));
         }
 
         let where_clause = if !where_clauses.is_empty() {
@@ -132,7 +101,7 @@ impl NFeIdentificationRepository {
             where_clause
         );
         let mut count_stmt = self.conn.statement(&count_sql).build()?;
-        for (name, value) in &params {
+        for (name, value) in &bind_params {
             count_stmt.bind(name.as_str(), value)?;
         }
         let mut rows = count_stmt.query(&[])?;
@@ -158,6 +127,7 @@ impl NFeIdentificationRepository {
                         NNF as n_nf,
                         TO_CHAR(DHEMI, 'YYYY-MM-DD HH24:MI:SS.FF3') as dh_emi,
                         TO_CHAR(DHSAIENT, 'YYYY-MM-DD HH24:MI:SS.FF3') as dh_sai_ent,
+                        TO_CHAR(DHCONT, 'YYYY-MM-DD HH24:MI:SS.FF3') as dh_cont,
                         TPNF as tp_nf,
                         IDDEST as id_dest,
                         CMUNFG as c_mun_fg,
@@ -170,7 +140,7 @@ impl NFeIdentificationRepository {
                         INDPRES as ind_pres,
                         PROCEMI as proc_emi,
                         VERPROC as ver_proc,
-                        TO_CHAR(DHCONT, 'YYYY-MM-DD HH24:MI:SS.FF3') as dh_cont,
+                        X_JUSTIFICATIVA as x_justificativa,
                         TO_CHAR(CREATEDAT, 'YYYY-MM-DD HH24:MI:SS.FF3') as created_at,
                         TO_CHAR(UPDATEDAT, 'YYYY-MM-DD HH24:MI:SS.FF3') as updated_at
                     FROM nfe_identifications
@@ -183,11 +153,11 @@ impl NFeIdentificationRepository {
         );
 
         let mut stmt = self.conn.statement(&sql).build()?;
-        for (name, value) in &params {
+        for (name, value) in &bind_params {
             stmt.bind(name.as_str(), value)?;
         }
-        stmt.bind("offset", &(offset + page_size))?;
-        stmt.bind("page_size", &page_size)?;
+        stmt.bind("offset", &(offset + params.page_size))?;
+        stmt.bind("page_size", &params.page_size)?;
         stmt.bind("offset", &offset)?;
         let rows = stmt.query(&[])?;
 
@@ -253,7 +223,7 @@ impl NFeIdentificationRepository {
                 ind_pres: row.get("ind_pres")?,
                 proc_emi: row.get("proc_emi")?,
                 ver_proc: row.get("ver_proc")?,
-                x_justificativa: None,
+                x_justificativa: row.get("x_justificativa")?,
                 created_at,
                 updated_at,
             };
@@ -270,7 +240,7 @@ impl NFeIdentificationRepository {
             )
             .await
         {
-            error!("Failed to cache NFe identifications: {}", e);
+            error!("Failed to cache NFe identifications list: {}", e);
         }
 
         Ok((identifications, total_count))
@@ -390,7 +360,7 @@ impl NFeIdentificationRepository {
                 ind_pres: row.get(19)?,
                 proc_emi: row.get(20)?,
                 ver_proc: row.get(21)?,
-                x_justificativa: None,
+                x_justificativa: row.get(22)?,
                 created_at,
                 updated_at,
             };

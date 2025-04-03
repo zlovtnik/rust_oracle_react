@@ -1,4 +1,5 @@
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
+use serde::Serialize;
 
 #[derive(Debug, Serialize)]
 pub struct ErrorResponse {
@@ -6,9 +7,10 @@ pub struct ErrorResponse {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 pub struct PaginationQuery {
-    pub page: Option<u32>,
-    pub page_size: Option<u32>,
+    pub page: u32,
+    pub page_size: u32,
 }
 
 #[derive(Debug, Serialize)]
